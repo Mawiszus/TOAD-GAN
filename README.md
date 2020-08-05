@@ -85,8 +85,8 @@ $ python generate_samples.py --seed_mariokart_road
 
 ## Authors
 
-* **Maren Awiszus** - Institut für Informationsverarbeitung, Leibniz University Hanover
-* **Frederik Schubert** - Institut für Informationsverarbeitung, Leibniz University Hanover
+* **[Maren Awiszus](https://www.tnt.uni-hannover.de/de/staff/awiszus/)** - Institut für Informationsverarbeitung, Leibniz University Hanover
+* **[Frederik Schubert](https://www.tnt.uni-hannover.de/de/staff/schubert/)** - Institut für Informationsverarbeitung, Leibniz University Hanover
 
 ## Copyright
 

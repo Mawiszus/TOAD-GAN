@@ -1,3 +1,12 @@
-Pillow>=7.1.2
-numpy>=1.18.5
+Pillow~=7.1.1
+numpy~=1.18.2
 torch===1.5.0+cpu
+wandb>=0.8.31
+torchvision>=0.6.0
+tqdm>=4.45.0
+umap-learn>=0.3.10
+loguru>=0.4.1
+matplotlib~=3.2.1
+seaborn~=0.10.0
+PyYAML~=5.3.1
+scikit-learn~=0.22.2.post1

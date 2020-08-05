@@ -1,0 +1,12 @@
+wandb/
+venv/
+.idea/
+output/
+.vscode/
+.history/
+__pycache__/
+tmp/
+slurm-*
+/input/umap_images/baselines
+/input/umap_images/old_baselines
+/input/umap_images/unused

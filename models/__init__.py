@@ -1,4 +1,4 @@
-# Code based on https://github.com/tamarott/SinGAN
+# Contains code based on https://github.com/tamarott/SinGAN
 import os
 import torch
 
@@ -83,42 +83,24 @@ def restore_weights(D_curr, G_curr, scale_num, opt):
     for i, token in enumerate(opt.token_list):
         for group_idx, group in enumerate(TOKEN_GROUPS):
             if token in group:
-                G_state_dict["head.conv.weight"][:, i] = G_head_conv_weight[
-                    :, group_idx
-                ]
+                G_state_dict["head.conv.weight"][:, i] = G_head_conv_weight[:, group_idx]
                 G_state_dict["tail.0.weight"][i] = G_tail_weight[group_idx]
                 G_state_dict["tail.0.bias"][i] = G_tail_bias[group_idx]
-                D_state_dict["head.conv.weight"][:, i] = D_head_conv_weight[
-                    :, group_idx
-                ]
+                D_state_dict["head.conv.weight"][:, i] = D_head_conv_weight[:, group_idx]
                 break
 
-    G_state_dict["head.conv.weight"] = (
-        G_state_dict["head.conv.weight"].detach().requires_grad_()
-    )
-    G_state_dict["tail.0.weight"] = (
-        G_state_dict["tail.0.weight"].detach().requires_grad_()
-    )
+    G_state_dict["head.conv.weight"] = (G_state_dict["head.conv.weight"].detach().requires_grad_())
+    G_state_dict["tail.0.weight"] = (G_state_dict["tail.0.weight"].detach().requires_grad_())
     G_state_dict["tail.0.bias"] = G_state_dict["tail.0.bias"].detach().requires_grad_()
-    D_state_dict["head.conv.weight"] = (
-        D_state_dict["head.conv.weight"].detach().requires_grad_()
-    )
+    D_state_dict["head.conv.weight"] = (D_state_dict["head.conv.weight"].detach().requires_grad_())
 
     G_curr.load_state_dict(G_state_dict)
     D_curr.load_state_dict(D_state_dict)
 
-    G_curr.head.conv.weight = torch.nn.Parameter(
-        G_curr.head.conv.weight.detach().requires_grad_()
-    )
-    G_curr.tail[0].weight = torch.nn.Parameter(
-        G_curr.tail[0].weight.detach().requires_grad_()
-    )
-    G_curr.tail[0].bias = torch.nn.Parameter(
-        G_curr.tail[0].bias.detach().requires_grad_()
-    )
-    D_curr.head.conv.weight = torch.nn.Parameter(
-        D_curr.head.conv.weight.detach().requires_grad_()
-    )
+    G_curr.head.conv.weight = torch.nn.Parameter(G_curr.head.conv.weight.detach().requires_grad_())
+    G_curr.tail[0].weight = torch.nn.Parameter(G_curr.tail[0].weight.detach().requires_grad_())
+    G_curr.tail[0].bias = torch.nn.Parameter(G_curr.tail[0].bias.detach().requires_grad_())
+    D_curr.head.conv.weight = torch.nn.Parameter(D_curr.head.conv.weight.detach().requires_grad_())
 
     return D_curr, G_curr
 

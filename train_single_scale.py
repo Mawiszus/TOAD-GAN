@@ -14,6 +14,8 @@ from draw_concat import draw_concat
 from generate_noise import generate_spatial_noise
 from mario.level_utils import group_to_token, one_hot_to_ascii_level, token_to_group
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
+from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
+from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from models import calc_gradient_penalty, save_networks
 
@@ -34,6 +36,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
     if opt.game == 'mario':
         token_group = MARIO_TOKEN_GROUPS
+    elif opt.game == 'zelda':
+        token_group = ZELDA_TOKEN_GROUPS
+    elif opt.game == 'megaman':
+        token_group = MEGAMAN_TOKEN_GROUPS
     else:  # if opt.game == 'mariokart':
         token_group = MARIOKART_TOKEN_GROUPS
 

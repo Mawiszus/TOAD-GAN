@@ -2,9 +2,14 @@
 from generate_samples import generate_samples
 from train import train
 from mariokart.tokens import REPLACE_TOKENS as MARIOKART_REPLACE_TOKENS
+from megaman.tokens import REPLACE_TOKENS as MEGAMAN_REPLACE_TOKENS
 from mario.tokens import REPLACE_TOKENS as MARIO_REPLACE_TOKENS
 from mariokart.level_image_gen import LevelImageGen as MariokartLevelGen
 from mariokart.special_mariokart_downsampling import special_mariokart_downsampling
+from megaman.level_image_gen import LevelImageGen as MegamanLevelGen
+from megaman.special_megaman_downsampling import special_megaman_downsampling
+from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
+from zelda.special_zelda_downsampling import special_zelda_downsampling
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_utils import read_level, read_level_from_file
@@ -49,12 +54,19 @@ def main():
         opt.ImgGen = MarioLevelGen(sprite_path)
         replace_tokens = MARIO_REPLACE_TOKENS
         downsample = special_mario_downsampling
+    elif opt.game == 'zelda':
+        opt.ImgGen = ZeldaLevelGen(sprite_path)
+        downsample = special_zelda_downsampling
+    elif opt.game == 'megaman':
+        opt.ImgGen = MegamanLevelGen(sprite_path, n_sheet=int(get_tags(opt)[0][-1]))
+        replace_tokens = MEGAMAN_REPLACE_TOKENS
+        downsample = special_megaman_downsampling
     elif opt.game == 'mariokart':
         opt.ImgGen = MariokartLevelGen(sprite_path)
         replace_tokens = MARIOKART_REPLACE_TOKENS
         downsample = special_mariokart_downsampling
     else:
-        NameError("name of --game not recognized. Supported: mario, mariokart")
+        NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
 
     # Read level according to input arguments
     real = read_level(opt, None, replace_tokens).to(opt.device)

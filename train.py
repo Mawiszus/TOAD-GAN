@@ -7,8 +7,12 @@ from tqdm import tqdm
 
 from mario.level_utils import one_hot_to_ascii_level, token_to_group
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
+from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
+from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from mario.special_mario_downsampling import special_mario_downsampling
+from zelda.special_zelda_downsampling import special_zelda_downsampling
+from megaman.special_megaman_downsampling import special_megaman_downsampling
 from mariokart.special_mariokart_downsampling import special_mariokart_downsampling
 from models import init_models, reset_grads, restore_weights
 from models.generator import Level_GeneratorConcatSkip2CleanAdd
@@ -23,6 +27,10 @@ def train(real, opt):
 
     if opt.game == 'mario':
         token_group = MARIO_TOKEN_GROUPS
+    elif opt.game == 'zelda':
+        token_group = ZELDA_TOKEN_GROUPS
+    elif opt.game == 'megaman':
+        token_group = MEGAMAN_TOKEN_GROUPS
     else:  # if opt.game == 'mariokart':
         token_group = MARIOKART_TOKEN_GROUPS
 
@@ -31,6 +39,10 @@ def train(real, opt):
 
     if opt.game == 'mario':
         scaled_list = special_mario_downsampling(opt.num_scales, scales, real, opt.token_list)
+    elif opt.game == 'zelda':
+        scaled_list = special_zelda_downsampling(opt.num_scales, scales, real, opt.token_list)
+    elif opt.game == 'megaman':
+        scaled_list = special_megaman_downsampling(opt.num_scales, scales, real, opt.token_list)
     else:  # if opt.game == 'mariokart':
         scaled_list = special_mariokart_downsampling(opt.num_scales, scales, real, opt.token_list)
 
@@ -61,6 +73,8 @@ def train(real, opt):
         # If we are seeding, we need to adjust the number of channels
         if current_scale < (opt.token_insert + 1):  # (stop_scale - 1):
             opt.nc_current = len(token_group)
+        else:
+            opt.nc_current = len(opt.token_list)
 
         # Initialize models
         D, G = init_models(opt)

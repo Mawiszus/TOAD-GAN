@@ -11,13 +11,21 @@ import matplotlib.pyplot as plt
 # sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))  # uncomment if opening form other dir
 
 from config import get_arguments, post_config
-from mario.level_utils import one_hot_to_ascii_level, group_to_token, token_to_group, read_level
+from mario.level_utils import one_hot_to_ascii_level, group_to_token, token_to_group, read_level, read_level_from_file, place_a_mario_token
+from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
+from zelda.special_zelda_downsampling import special_zelda_downsampling
+from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
+from megaman.special_megaman_downsampling import special_megaman_downsampling
+from megaman.level_image_gen import LevelImageGen as MegamanLevelGen
 from mariokart.special_mariokart_downsampling import special_mariokart_downsampling
 from mariokart.level_image_gen import LevelImageGen as MariokartLevelGen
 from mario.tokens import REPLACE_TOKENS as MARIO_REPLACE_TOKENS
+from megaman.tokens import REPLACE_TOKENS as MEGAMAN_REPLACE_TOKENS
 from mariokart.tokens import REPLACE_TOKENS as MARIOKART_REPLACE_TOKENS
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
+from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
+from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from mario.special_mario_downsampling import special_mario_downsampling
 from generate_noise import generate_spatial_noise
@@ -44,11 +52,15 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=
     # Check which game we are using for token groups
     if opt.game == 'mario':
         token_groups = MARIO_TOKEN_GROUPS
+    elif opt.game == 'zelda':
+        token_groups = ZELDA_TOKEN_GROUPS
+    elif opt.game == 'megaman':
+        token_groups = MEGAMAN_TOKEN_GROUPS
     elif opt.game == 'mariokart':
         token_groups = MARIOKART_TOKEN_GROUPS
     else:
         token_groups = []
-        NameError("name of --game not recognized. Supported: mario, mariokart")
+        NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
 
     # Main sampling loop
     for G, Z_opt, noise_amp in zip(generators, noise_maps, noise_amplitudes):

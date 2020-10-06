@@ -1,3 +1,14 @@
+If you are using this code in your own project, please cite our paper:
+
+```
+@inproceedings{awiszus2020toadgan,
+  title={TOAD-GAN: Coherent Style Level Generation from a Single Example},
+  author={Awiszus, Maren and Schubert, Frederik and Rosenhahn, Bodo},
+  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence and Interactive Digital Entertainment},
+  year={2020}
+}
+```
+
 # TOAD-GAN
 
 Official pytorch implementation of the paper: "TOAD-GAN: Coherent Style Level Generation from a Single Example"

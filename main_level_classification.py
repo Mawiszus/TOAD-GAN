@@ -164,6 +164,10 @@ def plot_means(curr_embed, curr_mapped, curr_labels, curr_images, name, with_tar
     plt.close()
     return means
 
+def save_embeddings(embeddings, name):
+    embeddings_path = os.path.join(wandb.run.dir, f"{name}_embeddings.pt")
+    torch.save(embeddings, embeddings_path)
+    wandb.save(embeddings_path)
 
 def plot_dataset(dataset, mapped, baselines_mapped, labels, means, name, with_targets):
     plot_embeddings(mapped, labels=np.array(

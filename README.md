@@ -22,6 +22,7 @@ The project was built for research purposes only.**
 ### AIIDE 2020
 
 Our paper "TOAD-GAN: Coherent Style Level Generation from a Single Example" was accepted for oral presentation at [AIIDE 2020](https://webdocs.cs.ualberta.ca/~santanad/aiide/index.html)!
+You can find our video presentation on [YouTube](https://youtu.be/_bnAtIYVx-s).
 
 Our code for TOAD-GUI and TOAD-GAN has been accepted for the AIIDE 2020 Artifact Evaluation Track! 
 It will be recognized in the [AIIDE 2020 Program](https://webdocs.cs.ualberta.ca/~santanad/aiide/program.html).

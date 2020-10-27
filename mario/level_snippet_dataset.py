@@ -16,17 +16,17 @@ class LevelSnippetDataset(Dataset):
      to only include level.txt files.
 
      token_list : If None, token_list is calculated internally. Can be set for different future applications.
-     level_idx : If None, __getitem__ returns the actual index with the retrieved slice. Can be set for different future
-        applications
     level_name : If None, all level files in folder are used, otherwise only level_name will be used.
     """
-    def __init__(self, level_dir, slice_width=16, token_list=None, level_idx=None, level_name=None,):
+
+    def __init__(self, level_dir, slice_width=16, token_list=None, level_name=None, debug=False):
         super(LevelSnippetDataset, self).__init__()
-        self.level_idx = level_idx
         self.ascii_levels = []
         uniques = set()
         self.level_names = []
-        logger.debug("Reading levels from directory {}", level_dir)
+        self.level_name = level_name
+        logger.debug("Reading levels from directory {} with name {}",
+                     level_dir, level_name or "")
         for level in tqdm(sorted(os.listdir(level_dir))):
             if not level.endswith(".txt") or (level_name is not None and level != level_name):
                 continue
@@ -35,9 +35,10 @@ class LevelSnippetDataset(Dataset):
             for line in curr_level:
                 for token in line:
                     if token != "\n" and token != "M" and token != "F":
-                    # if token != "M" and token != "F":
                         uniques.add(token)
             self.ascii_levels.append(curr_level)
+            if debug and len(self.ascii_levels) > 1:
+                break
 
         logger.trace("Levels: {}", self.level_names)
         if token_list is not None:
@@ -77,7 +78,7 @@ class LevelSnippetDataset(Dataset):
         ]
         return (
             lev_slice,
-            torch.tensor(i_l if self.level_idx is None else self.level_idx),
+            torch.tensor(i_l),
         )
 
     def __len__(self):

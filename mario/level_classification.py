@@ -1,14 +1,14 @@
-import argparse
 import math
+from typing import Dict, Optional
 
+import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import random_split, DataLoader
-
-import pytorch_lightning as pl
-from loguru import logger
 import umap
+from loguru import logger
+from tap.tap import Tap
+from torch.utils.data import DataLoader, random_split
 
 from mario.level_snippet_dataset import LevelSnippetDataset
 
@@ -33,23 +33,37 @@ class SnippetDiscriminator(nn.Module):
         return x_embedding, y_hat
 
 
+class LevelClassificationParams(Tap):
+    level_dir: str = "input"
+    train_split: float = 0.8
+    learning_rate: float = 1e-3
+    batch_size: int = 32
+    slice_width: int = 16
+    depth: int = 16
+    kernel_size: int = 3
+    stride: int = 2
+    debug: bool = False
+
+
 class LevelClassification(pl.LightningModule):
-    def __init__(self, hparams: argparse.Namespace):
+    def __init__(self, hparams: Dict):
         super().__init__()
-        self.hparams = hparams
+        self.save_hyperparameters()
+        self.params: LevelClassificationParams = LevelClassificationParams(
+            underscores_to_dashes=True).from_dict(hparams)
         self.dataset = LevelSnippetDataset(
-            level_dir=hparams.level_dir, slice_width=hparams.slice_width)
-        train_size = math.floor(hparams.train_split * len(self.dataset))
-        val_size = math.floor((1 - hparams.train_split)
+            level_dir=self.params.level_dir, slice_width=self.params.slice_width, debug=self.params.debug)
+        train_size = math.floor(self.params.train_split * len(self.dataset))
+        val_size = math.floor((1 - self.params.train_split)
                               * len(self.dataset)) + 1
         logger.info("Loaded dataset with {} snippets. Train/Validation split {}/{}",
                     len(self.dataset), train_size, val_size)
         self.train_dataset, self.val_dataset = random_split(
             self.dataset, [train_size, val_size])
         self.discriminator = SnippetDiscriminator(len(self.dataset.token_list), len(self.dataset.levels),
-                                                  depth=hparams.depth, kernel_size=hparams.kernel_size,
-                                                  stride=hparams.stride)
-        self.mapper: umap.UMAP = None
+                                                  depth=self.params.depth, kernel_size=self.params.kernel_size,
+                                                  stride=self.params.stride)
+        self.mapper: Optional[umap.UMAP] = None
 
     def forward(self, x):
         return self.discriminator(x)
@@ -58,30 +72,27 @@ class LevelClassification(pl.LightningModule):
         x, y = batch
         x_embedding, y_hat = self.forward(x)
         loss = F.cross_entropy(y_hat, y)
-        return {"loss": loss, "log": {"loss": loss}}
+        return {"loss": loss}
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
-            self.discriminator.parameters(), lr=self.hparams.learning_rate)
+            self.discriminator.parameters(), lr=self.params.learning_rate)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, len(self.dataset))
+            optimizer, len(self.dataset), eta_min=0)
         return [optimizer], [scheduler]
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, shuffle=True, batch_size=self.hparams.batch_size, num_workers=2)
+        return DataLoader(self.train_dataset, shuffle=True, batch_size=self.params.batch_size, num_workers=8)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.hparams.batch_size, num_workers=2)
+        return DataLoader(self.val_dataset, batch_size=self.params.batch_size, num_workers=8)
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         x_embedding, y_hat = self.forward(x)
         val_loss = F.cross_entropy(y_hat, y)
+        self.log("val_loss", val_loss)
         return {"val_loss": val_loss}
-
-    def validation_epoch_end(self, outputs):
-        avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
-        return {"val_loss": avg_loss, "log": {"avg_val_loss": avg_loss}}
 
     def on_save_checkpoint(self, checkpoint):
         if self.mapper is not None:
@@ -90,16 +101,3 @@ class LevelClassification(pl.LightningModule):
     def on_load_checkpoint(self, checkpoint):
         if "mapper" in checkpoint:
             self.mapper = checkpoint["mapper"]
-
-    @staticmethod
-    def add_args(parser: argparse.ArgumentParser):
-        parser.add_argument("--level-dir", type=str,
-                            metavar="DIR", default="input")
-        parser.add_argument("--train-split", type=float, default=0.8)
-        parser.add_argument("--learning-rate", type=float, default=1e-3)
-        parser.add_argument("--batch-size", type=int, default=32)
-        parser.add_argument("--slice-width", type=int, default=16)
-        parser.add_argument("--depth", type=int, default=16)
-        parser.add_argument("--kernel-size", type=int, default=3)
-        parser.add_argument("--stride", type=int, default=2)
-        return parser

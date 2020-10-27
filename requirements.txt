@@ -10,3 +10,5 @@ matplotlib~=3.2.1
 seaborn~=0.10.0
 PyYAML~=5.3.1
 scikit-learn~=0.22.2.post1
+typed-argument-parser==1.6.0
+pytorch_lightning==1.0.3

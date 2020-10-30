@@ -63,10 +63,33 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=
         NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
 
     # Main sampling loop
-    for G, Z_opt, noise_amp in zip(generators, noise_maps, noise_amplitudes):
+    for sc, (G, Z_opt, noise_amp) in enumerate(zip(generators, noise_maps, noise_amplitudes)):
+
+        # Make directories
+        dir2save = opt.out_ + '/' + save_dir
+        try:
+            os.makedirs(dir2save, exist_ok=True)
+            if render_images:
+                os.makedirs("%s/img" % dir2save, exist_ok=True)
+            if save_tensors:
+                os.makedirs("%s/torch" % dir2save, exist_ok=True)
+            os.makedirs("%s/txt" % dir2save, exist_ok=True)
+        except OSError:
+            pass
 
         if current_scale >= len(generators):
             break  # if we do not start at current_scale=0 we need this
+        elif sc < current_scale:
+            if opt.token_insert >= 0:
+                # Convert to ascii level
+                token_list = [list(group.keys())[0] for group in token_groups]
+                level = one_hot_to_ascii_level(in_s[0].detach().unsqueeze(0), token_list)
+
+                # Render and save level image
+                if render_images:
+                    img = opt.ImgGen.render(level)
+                    img.save("%s/img/%d_sc%d.png" % (dir2save, opt.token_insert, current_scale))
+            continue
 
         logger.info("Generating samples at scale {}", current_scale)
 
@@ -161,23 +184,14 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=
                                                                            1 - opt.seed_road.to(opt.device))
 
             # Save all scales
+
+
+
             # if True:
             # Save scale 0 and last scale
             # if current_scale == 0 or current_scale == len(reals) - 1:
             # Save only last scale
             if current_scale == len(reals) - 1:
-                dir2save = opt.out_ + '/' + save_dir
-
-                # Make directories
-                try:
-                    os.makedirs(dir2save, exist_ok=True)
-                    if render_images:
-                        os.makedirs("%s/img" % dir2save, exist_ok=True)
-                    if save_tensors:
-                        os.makedirs("%s/torch" % dir2save, exist_ok=True)
-                    os.makedirs("%s/txt" % dir2save, exist_ok=True)
-                except OSError:
-                    pass
 
                 # Convert to ascii level
                 level = one_hot_to_ascii_level(I_curr.detach(), token_list)
@@ -195,15 +209,15 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=
                 if save_tensors:
                     torch.save(I_curr, "%s/torch/%d_sc%d.pt" % (dir2save, n, current_scale))
 
-                # Token insertion render (experimental!)
-                if opt.token_insert >= 0 and current_scale >= 1:
-                    if old_in_s.shape[1] == len(token_groups):
-                        token_list = [list(group.keys())[0] for group in token_groups]
-                    else:
-                        token_list = opt.token_list
-                    level = one_hot_to_ascii_level(old_in_s.detach(), token_list)
-                    img = opt.ImgGen.render(level)
-                    img.save("%s/img/%d_sc%d.png" % (dir2save, n, current_scale - 1))
+            # Token insertion render (experimental!)
+            # if current_scale == opt.token_insert:
+            #     if old_in_s.shape[1] == len(token_groups):
+            #         token_list = [list(group.keys())[0] for group in token_groups]
+            #     else:
+            #         token_list = opt.token_list
+            #     level = one_hot_to_ascii_level(old_in_s.detach(), token_list)
+            #     img = opt.ImgGen.render(level)
+            #     img.save("%s/img/%d_sc%d.png" % (dir2save, n, current_scale))
 
             # Append current image
             images_cur.append(I_curr)
@@ -308,6 +322,7 @@ if __name__ == '__main__':
     parse.add_argument("--scale_h", type=float, help="horizontal scale factor", default=1.0)
     parse.add_argument("--gen_start_scale", type=int, help="scale to start generating in", default=0)
     parse.add_argument("--num_samples", type=int, help="number of samples to be generated", default=10)
+    parse.add_argument("--save_tensors", action="store_true", help="save pytorch .pt tensors?", default=False)
     parse.add_argument("--make_mario_samples", action="store_true", help="make 1000 samples for each mario generator"
                                                                          "specified in the code.", default=False)
     parse.add_argument("--seed_mariokart_road", action="store_true", help="seed mariokart generators with a road image",
@@ -377,7 +392,7 @@ if __name__ == '__main__':
 
     else:
         # Code to make samples for given generator
-        token_insertion = True if opt.token_insert and opt.token_insert_experiment else False
+        token_insertion = True if (opt.token_insert >= 0) and opt.token_insert_experiment else False
 
         # Init game specific inputs
         replace_tokens = {}
@@ -392,22 +407,48 @@ if __name__ == '__main__':
             replace_tokens = MARIOKART_REPLACE_TOKENS
             downsample = special_mariokart_downsampling
 
+        elif opt.game == 'zelda':
+            opt.ImgGen = ZeldaLevelGen(sprite_path)
+            replace_tokens = {}
+            downsample = special_zelda_downsampling
+
+        elif opt.game == 'megaman':
+            opt.ImgGen = MegamanLevelGen(sprite_path)
+            replace_tokens = MEGAMAN_REPLACE_TOKENS
+            downsample = special_megaman_downsampling
+
         else:
-            NameError("name of --game not recognized. Supported: mario, mariokart")
+            NameError("name of --game not recognized. Supported: mario, mariokart, zelda, megaman")
 
         # Load level
-        real = read_level(opt, None, replace_tokens).to(opt.device)
+        real = read_level(opt, None, replace_tokens)
+        if opt.use_multiple_inputs:
+            real = real[0].to(opt.device)
+        else:
+            real = real.to(opt.device)
+
         # Load Generator
         generators, noise_maps, reals, noise_amplitudes = load_trained_pyramid(opt)
 
+        if opt.use_multiple_inputs:
+            noise_maps = [m[0] for m in noise_maps]
+            reals = reals[0]
+
         # For Token insertion (Experimental!) --------------------------------------------------------------------------
         if token_insertion:
-            # set seed level (update opt_fakes.input_name accordingly)
-            seed_level = 0
+            # set seed level 0 is 1-1, 1 is 1-2, and 2 ia 1-3
+            seed_level = 2
 
             # Load "other level" used for insertion
             opt_fakes = Namespace()
-            opt_fakes.input_name = "lvl_1-1.txt"
+            if seed_level == 0:
+                opt_fakes.input_name = "lvl_1-1.txt"
+            elif seed_level == 1:
+                opt_fakes.input_name = "lvl_1-2.txt"
+            elif seed_level == 2:
+                opt_fakes.input_name = "lvl_1-3.txt"
+            elif seed_level == -1:  # seed with noise
+                opt_fakes.input_name = "lvl_1-1.txt"  # should not matter
             opt_fakes.input_dir = "./input"
             real_fakes = read_level(opt_fakes).to(opt.device)
 
@@ -415,32 +456,34 @@ if __name__ == '__main__':
             real_fakes_down = special_mario_downsampling(1, [[opt.scales[-1], opt.scales[-1]]],
                                                          real_fakes, opt_fakes.token_list)
 
-            run_dir = "/home/awiszus/Project/TOAD-GAN/wandb/"
+            run_dir = "/home/awiszus/Project/TOAD-GAN/output/wandb/"
             if seed_level == 0:  # Only done for mario levels 1 to 3 so far
-                real_fakes = torch.load(run_dir + 'run-20200311_113148-6fmy47ks/'
-                                                  'arbitrary_random_samples_v1_h0.297029702970297_start0/torch/'
-                                                  '1_sc0.pt',
-                                        device=opt.device)
+                real_fakes = torch.load(run_dir + 'run-20200901_072636-1ycydnos/'
+                                                  'arbitrary_random_samples_v1.00000_h0.24752_st0/torch/'
+                                                  '1_sc0.pt')
             elif seed_level == 1:
-                real_fakes = torch.load(run_dir + 'run-20200311_113200-55smfqkb/'
-                                                  'arbitrary_random_samples_v1_h0.379746835443038_start0/torch/'
-                                                  '7_sc0.pt',
-                                        device=opt.device)
+                real_fakes = torch.load(run_dir + 'run-20200901_143818-3aeh4668/'
+                                                  'arbitrary_random_samples_v1.00000_h0.31646_st0/torch/'
+                                                  '4_sc0.pt')
             elif seed_level == 2:
-                real_fakes = torch.load(run_dir + 'run-20200311_121708-jnus8kfl/'
-                                                  'arbitrary_random_samples_v1_h0.4_start0/torch/'
-                                                  '5_sc0.pt',
-                                        device=opt.device)
+                real_fakes = torch.load(run_dir + 'run-20200901_143829-3kcbthi9/'
+                                                  '/arbitrary_random_samples_v1.00000_h0.33333_st0/torch/'
+                                                  '10_sc0.pt')
             elif seed_level == -1:  # seed with noise
                 fakes_shape = real_fakes_down[0].shape
                 real_fakes = nn.Softmax2d()(torch.rand(fakes_shape, device=opt.device) * 50) * 1
 
+            real_fakes = real_fakes.to(opt.device)
+
+            cur_scale = opt.token_insert + 1
             in_s = real_fakes
-            prefix = "seeded"
+            prefix = "seeded" + str(seed_level)
 
         # --------------------------------------------------------------------------------------------------------------
 
         else:
+            cur_scale = 0
+
             # Get input shape for in_s
             real_down = downsample(1, [[opt.scale_v, opt.scale_h]], real, opt.token_list)
             real_down = real_down[0]
@@ -450,7 +493,8 @@ if __name__ == '__main__':
         # Directory name
         s_dir_name = "%s_random_samples_v%.5f_h%.5f_st%d" % (prefix, opt.scale_v, opt.scale_h, opt.gen_start_scale)
 
-        generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=in_s,
-                         scale_v=opt.scale_v, scale_h=opt.scale_h, save_dir=s_dir_name, num_samples=opt.num_samples)
+        generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=in_s, save_tensors=opt.save_tensors,
+                         scale_v=opt.scale_v, scale_h=opt.scale_h, save_dir=s_dir_name, num_samples=opt.num_samples,
+                         current_scale=cur_scale)
 
 

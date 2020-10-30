@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.nn.functional import interpolate
 from loguru import logger
 from tqdm import tqdm
-
+import random
 import wandb
 
 from draw_concat import draw_concat
@@ -32,7 +32,6 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
     this scale, input_from_previous_scale holds the noise map and images from the previous scale, noise_amplitudes hold
     the amplitudes for the noise in all the scales. opt is a namespace that holds all necessary parameters. """
     current_scale = len(generators)
-    real = reals[current_scale]
 
     if opt.game == 'mario':
         token_group = MARIO_TOKEN_GROUPS
@@ -43,8 +42,23 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
     else:  # if opt.game == 'mariokart':
         token_group = MARIOKART_TOKEN_GROUPS
 
-    nzx = real.shape[2]  # Noise size x
-    nzy = real.shape[3]  # Noise size y
+    if opt.use_multiple_inputs:
+        real_group = []
+        nzx_group = []
+        nzy_group = []
+        for scale_group in reals:
+            real_group.append(scale_group[current_scale])
+            nzx_group.append(scale_group[current_scale].shape[2])
+            nzy_group.append(scale_group[current_scale].shape[3])
+
+        curr_noises = [0 for _ in range(len(real_group))]
+        curr_prevs = [0 for _ in range(len(real_group))]
+        curr_z_prevs = [0 for _ in range(len(real_group))]
+
+    else:
+        real = reals[current_scale]
+        nzx = real.shape[2]  # Noise size x
+        nzy = real.shape[3]  # Noise size y
 
     padsize = int(1 * opt.num_layer)  # As kernel size is always 3 currently, padsize goes up by one per layer
 
@@ -62,42 +76,102 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
     schedulerG = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizerG, milestones=[1600, 2500], gamma=opt.gamma)
 
     if current_scale == 0:  # Generate new noise
-        z_opt = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
-        z_opt = pad_noise(z_opt)
+        if opt.use_multiple_inputs:
+            z_opt_group = []
+            for nzx, nzy in zip(nzx_group, nzy_group):
+                z_opt = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
+                z_opt = pad_noise(z_opt)
+                z_opt_group.append(z_opt)
+        else:
+            z_opt = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
+            z_opt = pad_noise(z_opt)
     else:  # Add noise to previous output
-        z_opt = torch.zeros([1, opt.nc_current, nzx, nzy]).to(opt.device)
-        z_opt = pad_noise(z_opt)
+        if opt.use_multiple_inputs:
+            z_opt_group = []
+            for nzx, nzy in zip(nzx_group, nzy_group):
+                z_opt = torch.zeros([1, opt.nc_current, nzx, nzy]).to(opt.device)
+                z_opt = pad_noise(z_opt)
+                z_opt_group.append(z_opt)
+        else:
+            z_opt = torch.zeros([1, opt.nc_current, nzx, nzy]).to(opt.device)
+            z_opt = pad_noise(z_opt)
 
+    curr_inp = 0
     logger.info("Training at scale {}", current_scale)
     for epoch in tqdm(range(opt.niter)):
         step = current_scale * opt.niter + epoch
-        noise_ = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
-        noise_ = pad_noise(noise_)
+        if opt.use_multiple_inputs:
+            group_steps = len(real_group)
+            noise_group = []
+            for nzx, nzy in zip(nzx_group, nzy_group):
+                noise_ = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
+                noise_ = pad_noise(noise_)
+                noise_group.append(noise_)
+        else:
+            group_steps = 1
+            noise_ = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
+            noise_ = pad_noise(noise_)
 
         ############################
         # (1) Update D network: maximize D(x) + D(G(z))
         ###########################
         for j in range(opt.Dsteps):
-            # train with real
-            D.zero_grad()
+            # if we have multiple inputs, we need to go over each of them
+            for curr_inp in range(group_steps):
+                if opt.use_multiple_inputs:
+                    real = real_group[curr_inp]
+                    nzx = nzx_group[curr_inp]
+                    nzy = nzy_group[curr_inp]
+                    z_opt = z_opt_group[curr_inp]
+                    noise_ = noise_group[curr_inp]
+                    prev_scale_results = input_from_prev_scale[curr_inp]
+                    opt.curr_inp = curr_inp
+                else:
+                    prev_scale_results = input_from_prev_scale
 
-            output = D(real).to(opt.device)
+                # train with real
+                D.zero_grad()
 
-            errD_real = -output.mean()
-            errD_real.backward(retain_graph=True)
+                output = D(real).to(opt.device)
 
-            # train with fake
-            if (j == 0) & (epoch == 0):
-                if current_scale == 0:  # If we are in the lowest scale, noise is generated from scratch
-                    prev = torch.zeros(1, opt.nc_current, nzx, nzy).to(opt.device)
-                    input_from_prev_scale = prev
-                    prev = pad_image(prev)
-                    z_prev = torch.zeros(1, opt.nc_current, nzx, nzy).to(opt.device)
-                    z_prev = pad_noise(z_prev)
-                    opt.noise_amp = 1
-                else:  # First step in NOT the lowest scale
-                    # We need to adapt our inputs from the previous scale and add noise to it
-                    prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, input_from_prev_scale,
+                errD_real = -output.mean()
+                errD_real.backward(retain_graph=True)
+
+                # train with fake
+                if (j == 0) & (epoch == 0):
+                    if current_scale == 0:  # If we are in the lowest scale, noise is generated from scratch
+                        prev = torch.zeros(1, opt.nc_current, nzx, nzy).to(opt.device)
+                        prev_scale_results = prev
+                        prev = pad_image(prev)
+                        z_prev = torch.zeros(1, opt.nc_current, nzx, nzy).to(opt.device)
+                        z_prev = pad_noise(z_prev)
+                        opt.noise_amp = 1
+                    else:  # First step in NOT the lowest scale
+                        # We need to adapt our inputs from the previous scale and add noise to it
+                        prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, prev_scale_results,
+                                           "rand", pad_noise, pad_image, opt)
+
+                        # For the seeding experiment, we need to transform from token_groups to the actual token
+                        if current_scale == (opt.token_insert + 1):
+                            prev = group_to_token(prev, opt.token_list, token_group)
+
+                        prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                        prev = pad_image(prev)
+                        z_prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, prev_scale_results,
+                                             "rec", pad_noise, pad_image, opt)
+
+                        # For the seeding experiment, we need to transform from token_groups to the actual token
+                        if current_scale == (opt.token_insert + 1):
+                            z_prev = group_to_token(z_prev, opt.token_list, token_group)
+
+                        z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                        opt.noise_amp = update_noise_amplitude(z_prev, real, opt)
+                        z_prev = pad_image(z_prev)
+                else:  # Any other step
+                    if opt.use_multiple_inputs:
+                        z_prev = curr_z_prevs[curr_inp]
+
+                    prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, prev_scale_results,
                                        "rand", pad_noise, pad_image, opt)
 
                     # For the seeding experiment, we need to transform from token_groups to the actual token
@@ -106,73 +180,71 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
                     prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
                     prev = pad_image(prev)
-                    z_prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, input_from_prev_scale,
-                                         "rec", pad_noise, pad_image, opt)
 
-                    # For the seeding experiment, we need to transform from token_groups to the actual token
-                    if current_scale == (opt.token_insert + 1):
-                        z_prev = group_to_token(z_prev, opt.token_list, token_group)
+                # After creating our correct noise input, we feed it to the generator:
+                noise = opt.noise_amp * noise_ + prev
+                fake = G(noise.detach(), prev, temperature=1 if current_scale != opt.token_insert else 1)
 
-                    z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=False)
-                    opt.noise_amp = update_noise_amplitude(z_prev, real, opt)
-                    z_prev = pad_image(z_prev)
-            else:  # Any other step
-                prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, input_from_prev_scale,
-                                   "rand", pad_noise, pad_image, opt)
+                # Then run the result through the discriminator
+                output = D(fake.detach())
+                errD_fake = output.mean()
 
-                # For the seeding experiment, we need to transform from token_groups to the actual token
-                if current_scale == (opt.token_insert + 1):
-                    prev = group_to_token(prev, opt.token_list, token_group)
+                # Backpropagation
+                errD_fake.backward(retain_graph=False)
 
-                prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
-                prev = pad_image(prev)
+                # Gradient Penalty
+                gradient_penalty = calc_gradient_penalty(D, real, fake, opt.lambda_grad, opt.device)
+                gradient_penalty.backward(retain_graph=False)
 
-            # After creating our correct noise input, we feed it to the generator:
-            noise = opt.noise_amp * noise_ + prev
-            fake = G(noise.detach(), prev, temperature=1 if current_scale != opt.token_insert else 1)
+                # Logging:
+                if step % 10 == 0:
+                    wandb.log({f"D(G(z))@{current_scale}": errD_fake.item(),
+                               f"D(x)@{current_scale}": -errD_real.item(),
+                               f"gradient_penalty@{current_scale}": gradient_penalty.item()
+                               },
+                              step=step, sync=False)
+                optimizerD.step()
 
-            # Then run the result through the discriminator
-            output = D(fake.detach())
-            errD_fake = output.mean()
+                if opt.use_multiple_inputs:
+                    z_opt_group[curr_inp] = z_opt
+                    input_from_prev_scale[curr_inp] = prev_scale_results
+                    curr_noises[curr_inp] = noise
+                    curr_prevs[curr_inp] = prev
+                    curr_z_prevs[curr_inp] = z_prev
 
-            # Backpropagation
-            errD_fake.backward(retain_graph=False)
-
-            # Gradient Penalty
-            gradient_penalty = calc_gradient_penalty(D, real, fake, opt.lambda_grad, opt.device)
-            gradient_penalty.backward(retain_graph=False)
-
-            # Logging:
-            if step % 10 == 0:
-                wandb.log({f"D(G(z))@{current_scale}": errD_fake.item(),
-                           f"D(x)@{current_scale}": -errD_real.item(),
-                           f"gradient_penalty@{current_scale}": gradient_penalty.item()
-                           },
-                          step=step, sync=False)
-            optimizerD.step()
 
         ############################
         # (2) Update G network: maximize D(G(z))
         ###########################
 
         for j in range(opt.Gsteps):
-            G.zero_grad()
-            fake = G(noise.detach(), prev.detach(), temperature=1 if current_scale != opt.token_insert else 1)
-            output = D(fake)
+            # if we have multiple inputs, we need to go over each of them
+            for curr_inp in range(group_steps):
+                if opt.use_multiple_inputs:
+                    opt.curr_inp = curr_inp
+                    real = real_group[curr_inp]
+                    z_opt = z_opt_group[curr_inp]
+                    noise = curr_noises[curr_inp]
+                    prev = curr_prevs[curr_inp]
+                    z_prev = curr_z_prevs[curr_inp]
 
-            errG = -output.mean()
-            errG.backward(retain_graph=False)
-            if opt.alpha != 0:  # i. e. we are trying to find an exact recreation of our input in the lat space
-                Z_opt = opt.noise_amp * z_opt + z_prev
-                G_rec = G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1)
-                rec_loss = opt.alpha * F.mse_loss(G_rec, real)
-                rec_loss.backward(retain_graph=False)  # TODO: Check for unexpected argument retain_graph=True
-                rec_loss = rec_loss.detach()
-            else:  # We are not trying to find an exact recreation
-                rec_loss = torch.zeros([])
-                Z_opt = z_opt
+                G.zero_grad()
+                fake = G(noise.detach(), prev.detach(), temperature=1 if current_scale != opt.token_insert else 1)
+                output = D(fake)
 
-            optimizerG.step()
+                errG = -output.mean()
+                errG.backward(retain_graph=False)
+                if opt.alpha != 0:  # i. e. we are trying to find an exact recreation of our input in the lat space
+                    Z_opt = opt.noise_amp * z_opt + z_prev
+                    G_rec = G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1)
+                    rec_loss = opt.alpha * F.mse_loss(G_rec, real)
+                    rec_loss.backward(retain_graph=False)  # TODO: Check for unexpected argument retain_graph=True
+                    rec_loss = rec_loss.detach()
+                else:  # We are not trying to find an exact recreation
+                    rec_loss = torch.zeros([])
+                    Z_opt = z_opt
+
+                optimizerG.step()
 
         # More Logging:
         if step % 10 == 0:
@@ -208,6 +280,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
         schedulerG.step()
 
     # Save networks
+
+    if opt.use_multiple_inputs:
+        z_opt = z_opt_group
+
     torch.save(z_opt, "%s/z_opt.pth" % opt.outf)
     save_networks(G, D, z_opt, opt)
     wandb.save(opt.outf)

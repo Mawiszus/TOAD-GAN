@@ -22,7 +22,10 @@ import torch
 
 def get_tags(opt):
     """ Get Tags for logging from input name. Helpful for wandb. """
-    return [opt.input_name.split(".")[0]]
+    if opt.use_multiple_inputs:
+        return [name.split(".")[0] for name in opt.input_names]
+    else:
+        return [opt.input_name.split(".")[0]]
 
 
 def main():
@@ -69,7 +72,12 @@ def main():
         NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
 
     # Read level according to input arguments
-    real = read_level(opt, None, replace_tokens).to(opt.device)
+    real = read_level(opt, None, replace_tokens)
+    if opt.use_multiple_inputs:
+        for i, r in enumerate(real):
+            real[i] = r.to(opt.device)
+    else:
+        real = real.to(opt.device)
 
     # Train!
     generators, noise_maps, reals, noise_amplitudes = train(real, opt)
@@ -77,18 +85,28 @@ def main():
     # Generate Samples of same size as level
     logger.info("Finished training! Generating random samples...")
     in_s = None
-    generate_samples(generators, noise_maps, reals,
+    if opt.use_multiple_inputs:
+        use_reals = reals[0]
+        use_maps = noise_maps[0]
+    else:
+        use_reals = reals
+        use_maps = noise_maps
+    generate_samples(generators, use_maps, use_reals,
                      noise_amplitudes, opt, in_s=in_s)
 
     # Generate samples of smaller size than level
     logger.info("Generating arbitrary sized random samples...")
     scale_v = 0.8  # Arbitrarily chosen scales
     scale_h = 0.4
-    real_down = downsample(1, [[scale_v, scale_h]], real, opt.token_list)
+    if opt.use_multiple_inputs:
+        tmp_real = real[0]
+    else:
+        tmp_real = real
+    real_down = downsample(1, [[scale_v, scale_h]], tmp_real, opt.token_list)
     real_down = real_down[0]
     # necessary for correct input shape
     in_s = torch.zeros(real_down.shape, device=opt.device)
-    generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=in_s,
+    generate_samples(generators, use_maps, use_reals, noise_amplitudes, opt, in_s=in_s,
                      scale_v=scale_v, scale_h=scale_h, save_dir="arbitrary_random_samples")
 
 

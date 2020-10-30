@@ -70,11 +70,39 @@ def one_hot_to_ascii_level(level, tokens):
 
 def read_level(opt, tokens=None, replace_tokens=REPLACE_TOKENS):
     """ Wrapper function for read_level_from_file using namespace opt. Updates parameters for opt."""
-    level, uniques = read_level_from_file(opt.input_dir, opt.input_name, tokens, replace_tokens)
-    opt.token_list = uniques
-    logger.info("Tokens in level {}", opt.token_list)
-    opt.nc_current = len(uniques)
-    return level
+    # If we have multiple levels as input, we need to sync the tokens
+    if opt.use_multiple_inputs:
+        uniques = set()
+        text_levels = []
+        for name in opt.input_names:
+            txt_level = load_level_from_text("%s/%s" % (opt.input_dir, name), replace_tokens)
+            for line in txt_level:
+                for token in line:
+                    # if token != "\n" and token != "M" and token != "F":
+                    if token != "\n" and token not in replace_tokens.items():
+                        uniques.add(token)
+            text_levels.append(txt_level)
+
+        uniques = list(uniques)
+        uniques.sort()  # necessary! otherwise we won't know the token order later
+        opt.token_list = uniques if tokens is None else tokens
+        logger.info("Tokens in levels {}", opt.token_list)
+        opt.nc_current = len(uniques)
+
+        levels = []
+        for text_level in text_levels:
+            oh_level = ascii_to_one_hot_level(text_level, uniques if tokens is None else tokens)
+            levels.append(oh_level.unsqueeze(dim=0))
+
+        return levels
+
+    else:
+        # Default: Only one input level
+        level, uniques = read_level_from_file(opt.input_dir, opt.input_name, tokens, replace_tokens)
+        opt.token_list = uniques
+        logger.info("Tokens in level {}", opt.token_list)
+        opt.nc_current = len(uniques)
+        return level
 
 
 def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPLACE_TOKENS):

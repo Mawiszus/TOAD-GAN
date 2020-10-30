@@ -22,6 +22,10 @@ def get_arguments():
     parser.add_argument("--out", help="output folder", default="output")
     parser.add_argument("--input-dir", help="input image dir", default="input")
     parser.add_argument("--input-name", help="input image name", default="lvl_1-1.txt")
+    parser.add_argument("--input-names", nargs='+', type=str, help="input image names (if multiple inputs are used)",
+                        default=["lvl_1-1.txt", "lvl_1-2.txt"])
+    parser.add_argument("--use_multiple_inputs", action="store_true",
+                        help="use mulitple inputs for training (use --input-names instead of --input-name)", default=0)
 
     # networks hyper parameters:
     parser.add_argument("--nfc", type=int, help="number of filters for conv layers", default=64)

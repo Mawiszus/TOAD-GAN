@@ -38,29 +38,55 @@ def train(real, opt):
     opt.num_scales = len(scales)
 
     if opt.game == 'mario':
-        scaled_list = special_mario_downsampling(opt.num_scales, scales, real, opt.token_list)
+        downsampling = special_mario_downsampling
     elif opt.game == 'zelda':
-        scaled_list = special_zelda_downsampling(opt.num_scales, scales, real, opt.token_list)
+        downsampling = special_zelda_downsampling
     elif opt.game == 'megaman':
-        scaled_list = special_megaman_downsampling(opt.num_scales, scales, real, opt.token_list)
+        downsampling = special_megaman_downsampling
     else:  # if opt.game == 'mariokart':
-        scaled_list = special_mariokart_downsampling(opt.num_scales, scales, real, opt.token_list)
+        downsampling = special_mariokart_downsampling
 
-    reals = [*scaled_list, real]
+    if opt.use_multiple_inputs:
+        reals = []
+        for level in real:
+            scaled_list = downsampling(opt.num_scales, scales, level, opt.token_list)
+            tmp_reals = [*scaled_list, level]
+            reals.append(tmp_reals)
+    else:
+        scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list)
+        reals = [*scaled_list, real]
 
     # If (experimental) token grouping feature is used:
     if opt.token_insert >= 0:
-        reals = [(token_to_group(r, opt.token_list, token_group) if i < opt.token_insert else r) for i, r in enumerate(reals)]
-        reals.insert(opt.token_insert, token_to_group(reals[opt.token_insert], opt.token_list, token_group))
-    input_from_prev_scale = torch.zeros_like(reals[0])
+        if opt.use_multiple_inputs:
+            NotImplementedError("Multiple inputs are not supported with token_insert")
+        else:
+            reals = [(token_to_group(r, opt.token_list, token_group) if i < opt.token_insert else r) for i, r in enumerate(reals)]
+            reals.insert(opt.token_insert, token_to_group(reals[opt.token_insert], opt.token_list, token_group))
 
-    stop_scale = len(reals)
+    if opt.use_multiple_inputs:
+        input_from_prev_scale = []
+        for group in reals:
+            input_from_prev_scale.append(torch.zeros_like(group[0]))
+
+        stop_scale = len(reals[0])
+    else:
+        input_from_prev_scale = torch.zeros_like(reals[0])
+        stop_scale = len(reals)
+
     opt.stop_scale = stop_scale
 
-    # Log the original input level as an image
-    img = opt.ImgGen.render(one_hot_to_ascii_level(real, opt.token_list))
-    wandb.log({"real": wandb.Image(img)}, commit=False)
-    os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
+    # Log the original input level(s) as an image
+    if opt.use_multiple_inputs:
+        for i, level in enumerate(real):
+            img = opt.ImgGen.render(one_hot_to_ascii_level(level, opt.token_list))
+            wandb.log({"real" + str(i): wandb.Image(img)}, commit=False)
+            os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
+    else:
+        # Default: One image
+        img = opt.ImgGen.render(one_hot_to_ascii_level(real, opt.token_list))
+        wandb.log({"real": wandb.Image(img)}, commit=False)
+        os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
 
     # Training Loop
     for current_scale in range(0, stop_scale):

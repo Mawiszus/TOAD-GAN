@@ -1,3 +1,4 @@
+from typing import Optional
 from config import Config
 import os
 from shutil import copyfile
@@ -341,33 +342,30 @@ def generate_mario_samples(opt_m):
                          os.path.join(newpath, f))
 
 
+class GenerateSamplesConfig(Config):
+    out_: str  # folder containing generator files
+    scale_v: float = 1.0  # vertical scale factor
+    scale_h: float = 1.0  # horizontal scale factor
+    gen_start_scale: int = 0  # scale to start generating in
+    num_samples: int = 10  # number of samples to be generated
+    save_tensors: bool = False  # save pytorch .pt tensors?
+    # make 1000 samples for each mario generator specified in the code.
+    make_mario_samples: bool = False
+    seed_mariokart_road: bool = False  # seed mariokart generators with a road image
+    # make token insert experiment (experimental!)
+    token_insert_experiment: bool = False
+
+    def process_args(self):
+        self.seed_road: Optional[torch.Tensor] = None
+        if (not self.out_) and (not self.make_mario_samples):
+            raise Exception(
+                '--out_ is required (--make_mario_samples experiment is the exception)')
+
+
 if __name__ == '__main__':
     # NOTICE: The "output" dir is where the generator is located as with main.py, even though it is the "input" here
 
-    # Parse arguments
-    parse = Config()
-    parse.add_argument("--out_", help="folder containing generator files")
-    parse.add_argument("--scale_v", type=float,
-                       help="vertical scale factor", default=1.0)
-    parse.add_argument("--scale_h", type=float,
-                       help="horizontal scale factor", default=1.0)
-    parse.add_argument("--gen_start_scale", type=int,
-                       help="scale to start generating in", default=0)
-    parse.add_argument("--num_samples", type=int,
-                       help="number of samples to be generated", default=10)
-    parse.add_argument("--save_tensors", action="store_true",
-                       help="save pytorch .pt tensors?", default=False)
-    parse.add_argument("--make_mario_samples", action="store_true", help="make 1000 samples for each mario generator"
-                                                                         "specified in the code.", default=False)
-    parse.add_argument("--seed_mariokart_road", action="store_true", help="seed mariokart generators with a road image",
-                       default=False)
-    parse.add_argument("--token_insert_experiment", action="store_true", help="make token insert experiment "
-                                                                              "(experimental!)", default=False)
-    opt = parse.parse_args()
-
-    if (not opt.out_) and (not opt.make_mario_samples):
-        parse.error(
-            '--out_ is required (--make_mario_samples experiment is the exception)')
+    opt = GenerateSamplesConfig().parse_args()
 
     if opt.make_mario_samples:
         # Code to make a large body of mario samples for other experiments

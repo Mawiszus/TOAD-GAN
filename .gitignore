@@ -10,3 +10,5 @@ slurm-*
 /input/umap_images/baselines
 /input/umap_images/old_baselines
 /input/umap_images/unused
+slurm_logs
+main.sh

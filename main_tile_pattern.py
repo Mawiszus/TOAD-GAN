@@ -1,14 +1,15 @@
-import argparse
 import collections
 import math
 import multiprocessing as mp
 import os
 import sys
 from functools import partial
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from tap.tap import Tap
 import yaml
 from loguru import logger
 from sklearn.metrics import ConfusionMatrixDisplay
@@ -18,20 +19,15 @@ import wandb
 from mario.level_snippet_dataset import LevelSnippetDataset
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--project", type=str, default="mario")
-    parser.add_argument("--tags", nargs="*", type=str, default=["similarity"])
-    parser.add_argument("--job-type", type=str, default="eval")
-    parser.add_argument("--level-dir", type=str,
-                        metavar="DIR", default="Input/Images")
-    parser.add_argument("--run-dir", type=str, metavar="DIR")
-    parser.add_argument("--slice-width", type=int, default=16)
-    parser.add_argument("--weight", type=float, default=1.0)
-    parser.add_argument("--pattern-sizes", nargs="+",
-                        type=int, default=[4, 3, 2])
-    hparams = parser.parse_args()
-    return hparams
+class Params(Tap):
+    run_dir: str
+    slice_width: int = 16
+    weight: float = 1.0
+    pattern_sizes: List[int] = [4, 3, 2]
+    project: str = "mario"
+    tags: List[str] = ["similarity"]
+    job_type: str = "eval"
+    level_dir: str = "input"
 
 
 def pattern_key(level_slice):
@@ -89,7 +85,7 @@ def main():
         colorize=True,
         format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level}</level> | <light-black>{file.path}:{line}</light-black> | {message}",
     )
-    hparams = parse_args()
+    hparams = Params(underscores_to_dashes=True).parse_args()
     wandb.init(
         project=hparams.project,
         tags=hparams.tags,

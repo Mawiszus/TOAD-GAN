@@ -1,4 +1,5 @@
 # Code inspired by https://github.com/tamarott/SinGAN
+from config import Config
 import os
 
 import torch
@@ -19,7 +20,7 @@ from models.generator import Level_GeneratorConcatSkip2CleanAdd
 from train_single_scale import train_single_scale
 
 
-def train(real, opt):
+def train(real, opt: Config):
     """ Wrapper function for training. Calculates necessary scales then calls train_single_scale on each. """
     generators = []
     noise_maps = []

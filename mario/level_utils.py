@@ -1,3 +1,5 @@
+from typing import List
+from config import Config
 import torch
 from loguru import logger
 
@@ -44,7 +46,7 @@ def load_level_from_text(path_to_level_txt, replace_tokens=REPLACE_TOKENS):
     return ascii_level
 
 
-def ascii_to_one_hot_level(level, tokens):
+def ascii_to_one_hot_level(level, tokens) -> torch.Tensor:
     """ Converts an ascii level to a full token level tensor. """
     oh_level = torch.zeros((len(tokens), len(level), len(level[-1])))
     for i in range(len(level)):
@@ -68,14 +70,15 @@ def one_hot_to_ascii_level(level, tokens):
     return ascii_level
 
 
-def read_level(opt, tokens=None, replace_tokens=REPLACE_TOKENS):
+def read_level(opt: Config, tokens=None, replace_tokens=REPLACE_TOKENS):
     """ Wrapper function for read_level_from_file using namespace opt. Updates parameters for opt."""
     # If we have multiple levels as input, we need to sync the tokens
     if opt.use_multiple_inputs:
         uniques = set()
         text_levels = []
         for name in opt.input_names:
-            txt_level = load_level_from_text("%s/%s" % (opt.input_dir, name), replace_tokens)
+            txt_level = load_level_from_text(
+                "%s/%s" % (opt.input_dir, name), replace_tokens)
             for line in txt_level:
                 for token in line:
                     # if token != "\n" and token != "M" and token != "F":
@@ -89,16 +92,18 @@ def read_level(opt, tokens=None, replace_tokens=REPLACE_TOKENS):
         logger.info("Tokens in levels {}", opt.token_list)
         opt.nc_current = len(uniques)
 
-        levels = []
+        levels: List[torch.Tensor] = []
         for text_level in text_levels:
-            oh_level = ascii_to_one_hot_level(text_level, uniques if tokens is None else tokens)
+            oh_level = ascii_to_one_hot_level(
+                text_level, uniques if tokens is None else tokens)
             levels.append(oh_level.unsqueeze(dim=0))
 
         return levels
 
     else:
         # Default: Only one input level
-        level, uniques = read_level_from_file(opt.input_dir, opt.input_name, tokens, replace_tokens)
+        level, uniques = read_level_from_file(
+            opt.input_dir, opt.input_name, tokens, replace_tokens)
         opt.token_list = uniques
         logger.info("Tokens in level {}", opt.token_list)
         opt.nc_current = len(uniques)
@@ -108,7 +113,8 @@ def read_level(opt, tokens=None, replace_tokens=REPLACE_TOKENS):
 def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPLACE_TOKENS):
     """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.
     Token. """
-    txt_level = load_level_from_text("%s/%s" % (input_dir, input_name), replace_tokens)
+    txt_level = load_level_from_text(
+        "%s/%s" % (input_dir, input_name), replace_tokens)
     uniques = set()
     for line in txt_level:
         for token in line:
@@ -117,7 +123,8 @@ def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPL
                 uniques.add(token)
     uniques = list(uniques)
     uniques.sort()  # necessary! otherwise we won't know the token order later
-    oh_level = ascii_to_one_hot_level(txt_level, uniques if tokens is None else tokens)
+    oh_level = ascii_to_one_hot_level(
+        txt_level, uniques if tokens is None else tokens)
     return oh_level.unsqueeze(dim=0), uniques
 
 

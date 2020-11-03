@@ -39,8 +39,8 @@ def main():
                                          token_list=model.dataset.token_list, debug=hparams.debug) for level_name in sorted(os.listdir(hparams.baseline_level_dir))]
     display_labels = [dataset.level_name for dataset in train_datasets]
     train_datasets = [DataLoader(
-        dataset, batch_size=512, num_workers=os.cpu_count()) for dataset in train_datasets]
-    test_datasets = [DataLoader(dataset, batch_size=512, num_workers=os.cpu_count())
+        dataset, batch_size=512, num_workers=os.cpu_count() or 1) for dataset in train_datasets]
+    test_datasets = [DataLoader(dataset, batch_size=512, num_workers=os.cpu_count() or 1)
                      for dataset in test_datasets]
     train_embeddings = []
     for train_dataset in train_datasets:

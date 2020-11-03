@@ -1,6 +1,6 @@
 Pillow~=7.1.1
 numpy~=1.18.2
-torch===1.5.0+cpu
+torch===1.7.0+cpu
 wandb>=0.8.31
 torchvision>=0.6.0
 tqdm>=4.45.0

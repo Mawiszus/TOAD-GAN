@@ -13,7 +13,7 @@ from zelda.special_zelda_downsampling import special_zelda_downsampling
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_utils import read_level, read_level_from_file
-from config import get_arguments, post_config
+from config import Config
 from loguru import logger
 import wandb
 import sys
@@ -42,8 +42,7 @@ def main():
                       + "{message}")
 
     # Parse arguments
-    opt = get_arguments().parse_args()
-    opt = post_config(opt)
+    opt = Config().parse_args()
 
     # Init wandb
     run = wandb.init(project="mario", tags=get_tags(opt),
@@ -61,7 +60,8 @@ def main():
         opt.ImgGen = ZeldaLevelGen(sprite_path)
         downsample = special_zelda_downsampling
     elif opt.game == 'megaman':
-        opt.ImgGen = MegamanLevelGen(sprite_path, n_sheet=int(get_tags(opt)[0][-1]))
+        opt.ImgGen = MegamanLevelGen(
+            sprite_path, n_sheet=int(get_tags(opt)[0][-1]))
         replace_tokens = MEGAMAN_REPLACE_TOKENS
         downsample = special_megaman_downsampling
     elif opt.game == 'mariokart':
@@ -69,7 +69,8 @@ def main():
         replace_tokens = MARIOKART_REPLACE_TOKENS
         downsample = special_mariokart_downsampling
     else:
-        NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
+        NameError(
+            "name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
 
     # Read level according to input arguments
     real = read_level(opt, None, replace_tokens)

@@ -354,8 +354,10 @@ class GenerateSamplesConfig(Config):
     seed_mariokart_road: bool = False  # seed mariokart generators with a road image
     # make token insert experiment (experimental!)
     token_insert_experiment: bool = False
+    not_cuda: bool = False  # disables cuda
 
     def process_args(self):
+        self.device = torch.device("cpu" if self.not_cuda else "cuda:0")
         self.seed_road: Optional[torch.Tensor] = None
         if (not self.out_) and (not self.make_mario_samples):
             raise Exception(

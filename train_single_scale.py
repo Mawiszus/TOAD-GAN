@@ -112,23 +112,22 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             noise_ = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
             noise_ = pad_noise(noise_)
 
-        ############################
-        # (1) Update D network: maximize D(x) + D(G(z))
-        ###########################
-        for j in range(opt.Dsteps):
-            # if we have multiple inputs, we need to go over each of them
-            for curr_inp in range(group_steps):
-                if opt.use_multiple_inputs:
-                    real = real_group[curr_inp]
-                    nzx = nzx_group[curr_inp]
-                    nzy = nzy_group[curr_inp]
-                    z_opt = z_opt_group[curr_inp]
-                    noise_ = noise_group[curr_inp]
-                    prev_scale_results = input_from_prev_scale[curr_inp]
-                    opt.curr_inp = curr_inp
-                else:
-                    prev_scale_results = input_from_prev_scale
+        for curr_inp in range(group_steps):
+            if opt.use_multiple_inputs:
+                real = real_group[curr_inp]
+                nzx = nzx_group[curr_inp]
+                nzy = nzy_group[curr_inp]
+                z_opt = z_opt_group[curr_inp]
+                noise_ = noise_group[curr_inp]
+                prev_scale_results = input_from_prev_scale[curr_inp]
+                opt.curr_inp = curr_inp
+            else:
+                prev_scale_results = input_from_prev_scale
 
+            ############################
+            # (1) Update D network: maximize D(x) + D(G(z))
+            ###########################
+            for j in range(opt.Dsteps):
                 # train with real
                 D.zero_grad()
 
@@ -213,21 +212,11 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                     curr_z_prevs[curr_inp] = z_prev
 
 
-        ############################
-        # (2) Update G network: maximize D(G(z))
-        ###########################
+            ############################
+            # (2) Update G network: maximize D(G(z))
+            ###########################
 
-        for j in range(opt.Gsteps):
-            # if we have multiple inputs, we need to go over each of them
-            for curr_inp in range(group_steps):
-                if opt.use_multiple_inputs:
-                    opt.curr_inp = curr_inp
-                    real = real_group[curr_inp]
-                    z_opt = z_opt_group[curr_inp]
-                    noise = curr_noises[curr_inp]
-                    prev = curr_prevs[curr_inp]
-                    z_prev = curr_z_prevs[curr_inp]
-
+            for j in range(opt.Gsteps):
                 G.zero_grad()
                 fake = G(noise.detach(), prev.detach(), temperature=1 if current_scale != opt.token_insert else 1)
                 output = D(fake)
@@ -275,9 +264,9 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 f.writelines(real_scaled)
             wandb.save(real_scaled_path)
 
-        # Learning Rate scheduler step
-        schedulerD.step()
-        schedulerG.step()
+            # Learning Rate scheduler step
+            schedulerD.step()
+            schedulerG.step()
 
     # Save networks
 

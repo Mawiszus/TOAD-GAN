@@ -97,6 +97,16 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             z_opt = pad_noise(z_opt)
 
     logger.info("Training at scale {}", current_scale)
+    grad_d_real = []
+    grad_d_fake = []
+    grad_g = []
+    for p in D.parameters():
+        grad_d_real.append(torch.zeros(p.shape).to(opt.device))
+        grad_d_fake.append(torch.zeros(p.shape).to(opt.device))
+
+    for p in G.parameters():
+        grad_g.append(torch.zeros(p.shape).to(opt.device))
+
     for epoch in tqdm(range(opt.niter)):
         step = current_scale * opt.niter + epoch
         if opt.use_multiple_inputs:
@@ -123,16 +133,6 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             else:
                 prev_scale_results = input_from_prev_scale
 
-            grad_d_real = []
-            grad_d_fake = []
-            grad_g = []
-            for p in D.parameters():
-                grad_d_real.append(torch.zeros(p.shape).to(opt.device))
-                grad_d_fake.append(torch.zeros(p.shape).to(opt.device))
-
-            for p in G.parameters():
-                grad_g.append(torch.zeros(p.shape).to(opt.device))
-
             ############################
             # (1) Update D network: maximize D(x) + D(G(z))
             ###########################
@@ -150,7 +150,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 cos_sim = []
                 for i, p in enumerate(D.parameters()):
                     grads_after.append(p.grad)
-                    cos_sim.append(nn.CosineSimilarity(0)(grad_d_real[i], p.grad).mean().item())
+                    cos_sim.append(nn.CosineSimilarity(-1)(grad_d_real[i], p.grad).mean().item())
 
                 diff_d_real = np.mean(cos_sim)
 
@@ -211,19 +211,19 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # Backpropagation
                 errD_fake.backward(retain_graph=False)
 
+                # Gradient Penalty
+                gradient_penalty = calc_gradient_penalty(D, real, fake, opt.lambda_grad, opt.device)
+                gradient_penalty.backward(retain_graph=False)
+
                 grads_after = []
                 cos_sim = []
                 for i, p in enumerate(D.parameters()):
                     grads_after.append(p.grad)
-                    cos_sim.append(nn.CosineSimilarity(0)(grad_d_fake[i], p.grad).mean().item())
+                    cos_sim.append(nn.CosineSimilarity(-1)(grad_d_fake[i], p.grad).mean().item())
 
                 diff_d_fake = np.mean(cos_sim)
 
                 grad_d_fake = grads_after
-
-                # Gradient Penalty
-                gradient_penalty = calc_gradient_penalty(D, real, fake, opt.lambda_grad, opt.device)
-                gradient_penalty.backward(retain_graph=False)
 
                 # Logging:
                 if step % 10 == 0:
@@ -260,7 +260,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 cos_sim = []
                 for i, p in enumerate(G.parameters()):
                     grads_after.append(p.grad)
-                    cos_sim.append(nn.CosineSimilarity(0)(grad_g[i], p.grad).mean().item())
+                    cos_sim.append(nn.CosineSimilarity(-1)(grad_g[i], p.grad).mean().item())
 
                 diff_g = np.mean(cos_sim)
 

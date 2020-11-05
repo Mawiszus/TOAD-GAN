@@ -98,13 +98,18 @@ def main():
     display_labels = sorted([name for name in dataset.level_names])
     confusion_matrix_mean_dict = {}
     confusion_matrix_var_dict = {}
+    level_names = []
     # The run directory is expected to contain samples from all levels
     for run_dir in os.listdir(hparams.run_dir):
         run_dir = os.path.join(hparams.run_dir, run_dir)
-        with open(os.path.join(run_dir, "config.yaml"), "r") as f:
+        with open(os.path.join(run_dir, "files", "config.yaml"), "r") as f:
             config = yaml.load(f)
-        test_level_dir = os.path.join(run_dir, "random_samples", "txt")
-        level_name = config["input_name"]["value"]
+        test_level_dir = os.path.join(run_dir, "files", "test_samples", "txt")
+        if config["use_multiple_inputs"]["value"]:
+            level_name = "lvl_1-inputs" + "_a" + str(config["alpha"]["value"]) + ".txt"
+        else:
+            level_name = config["input_name"]["value"][:-4] + "_a" + str(config["alpha"]["value"]) + ".txt"
+        level_names.append(level_name)
         divergences_mean = {}
         divergences_var = {}
         for current_level_name in dataset.level_names:
@@ -129,9 +134,9 @@ def main():
         confusion_matrix = []
         table = wandb.Table(
             columns=["training level"]
-            + [f"KL-divergence from level {i}" for i in range(1, 16)]
+            + [f"KL-divergence from level {i}" for i in range(1, len(display_labels)+1)]
         )
-        for level_name in display_labels:
+        for level_name in level_names:
             row = []
             for current_level_name in display_labels:
                 row.append(
@@ -142,7 +147,7 @@ def main():
         confusion_matrix = np.array(confusion_matrix)
         sns.set(context="paper", style="white")
         confusion_display = ConfusionMatrixDisplay(
-            confusion_matrix, [name.split(".")[0] for name in display_labels],
+            confusion_matrix, [name.split(".")[0] for name in level_names],
         )
         confusion_display.plot()
         ax = confusion_display.ax_

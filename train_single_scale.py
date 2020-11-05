@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.nn.functional import interpolate
 from loguru import logger
 from tqdm import tqdm
-import random
+import numpy as np
 import wandb
 
 from draw_concat import draw_concat
@@ -96,7 +96,6 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             z_opt = torch.zeros([1, opt.nc_current, nzx, nzy]).to(opt.device)
             z_opt = pad_noise(z_opt)
 
-    curr_inp = 0
     logger.info("Training at scale {}", current_scale)
     for epoch in tqdm(range(opt.niter)):
         step = current_scale * opt.niter + epoch
@@ -124,6 +123,16 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             else:
                 prev_scale_results = input_from_prev_scale
 
+            grad_d_real = []
+            grad_d_fake = []
+            grad_g = []
+            for p in D.parameters():
+                grad_d_real.append(torch.zeros(p.shape).to(opt.device))
+                grad_d_fake.append(torch.zeros(p.shape).to(opt.device))
+
+            for p in G.parameters():
+                grad_g.append(torch.zeros(p.shape).to(opt.device))
+
             ############################
             # (1) Update D network: maximize D(x) + D(G(z))
             ###########################
@@ -134,7 +143,18 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 output = D(real).to(opt.device)
 
                 errD_real = -output.mean()
+
                 errD_real.backward(retain_graph=True)
+
+                grads_after = []
+                cos_sim = []
+                for i, p in enumerate(D.parameters()):
+                    grads_after.append(p.grad)
+                    cos_sim.append(nn.CosineSimilarity(0)(grad_d_real[i], p.grad).mean().item())
+
+                diff_d_real = np.mean(cos_sim)
+
+                grad_d_real = grads_after
 
                 # train with fake
                 if (j == 0) & (epoch == 0):
@@ -191,6 +211,16 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # Backpropagation
                 errD_fake.backward(retain_graph=False)
 
+                grads_after = []
+                cos_sim = []
+                for i, p in enumerate(D.parameters()):
+                    grads_after.append(p.grad)
+                    cos_sim.append(nn.CosineSimilarity(0)(grad_d_fake[i], p.grad).mean().item())
+
+                diff_d_fake = np.mean(cos_sim)
+
+                grad_d_fake = grads_after
+
                 # Gradient Penalty
                 gradient_penalty = calc_gradient_penalty(D, real, fake, opt.lambda_grad, opt.device)
                 gradient_penalty.backward(retain_graph=False)
@@ -199,7 +229,9 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 if step % 10 == 0:
                     wandb.log({f"D(G(z))@{current_scale}": errD_fake.item(),
                                f"D(x)@{current_scale}": -errD_real.item(),
-                               f"gradient_penalty@{current_scale}": gradient_penalty.item()
+                               f"gradient_penalty@{current_scale}": gradient_penalty.item(),
+                               f"D_real_grad@{current_scale}": diff_d_real,
+                               f"D_fake_grad@{current_scale}": diff_d_fake,
                                },
                               step=step, sync=False)
                 optimizerD.step()
@@ -223,6 +255,17 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
                 errG = -output.mean()
                 errG.backward(retain_graph=False)
+
+                grads_after = []
+                cos_sim = []
+                for i, p in enumerate(G.parameters()):
+                    grads_after.append(p.grad)
+                    cos_sim.append(nn.CosineSimilarity(0)(grad_g[i], p.grad).mean().item())
+
+                diff_g = np.mean(cos_sim)
+
+                grad_g = grads_after
+
                 if opt.alpha != 0:  # i. e. we are trying to find an exact recreation of our input in the lat space
                     Z_opt = opt.noise_amp * z_opt + z_prev
                     G_rec = G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1)
@@ -238,7 +281,8 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
         # More Logging:
         if step % 10 == 0:
             wandb.log({f"noise_amplitude@{current_scale}": opt.noise_amp,
-                       f"rec_loss@{current_scale}": rec_loss.item()},
+                       f"rec_loss@{current_scale}": rec_loss.item(),
+                       f"G_grad@{current_scale}": diff_g},
                       step=step, sync=False, commit=True)
 
         # Rendering and logging images of levels

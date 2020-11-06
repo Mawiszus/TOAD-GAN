@@ -34,7 +34,7 @@ class SnippetDiscriminator(nn.Module):
 
 
 class LevelClassificationParams(Tap):
-    level_dir: str = "input"
+    level_dir: str = "input/mario"
     train_split: float = 0.8
     learning_rate: float = 1e-3
     batch_size: int = 32

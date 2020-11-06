@@ -1,4 +1,5 @@
 import os
+from re import L
 import sys
 from typing import List, Optional
 
@@ -38,7 +39,7 @@ def main():
     logger.add(sys.stdout, colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> " +
                                                  "| <level>{level}</level> " +
                                                  "| <light-black>{file.path}:{line}</light-black> | {message}")
-    hparams = Params(underscores_to_dashes=True).parse_args()
+    hparams = Params().parse_args()
     if hparams.restore:
         wandb.init(project=hparams.project, tags=hparams.tags)
         model = LevelClassification.load_from_checkpoint(hparams.restore)
@@ -61,8 +62,11 @@ def main():
     baseline_datasets = []
     logger.info("Baselines {}", os.listdir(hparams.baseline_level_dir))
     for i, baseline_level_dir in enumerate(sorted(os.listdir(hparams.baseline_level_dir))):
-        baseline_dataset = LevelSnippetDataset(level_dir=os.path.join(os.getcwd(), hparams.baseline_level_dir,
-                                                                      baseline_level_dir),
+        level_dir = os.path.join(hparams.baseline_level_dir,
+                                 baseline_level_dir)
+        if not os.path.isdir(level_dir):
+            continue
+        baseline_dataset = LevelSnippetDataset(level_dir=level_dir,
                                                slice_width=model.dataset.slice_width,
                                                token_list=model.dataset.token_list, debug=hparams.debug)
         baseline_datasets.append(baseline_dataset)
@@ -73,7 +77,7 @@ def visualize_embeddings(dataset: LevelSnippetDataset, model: LevelClassificatio
     dataloader = DataLoader(dataset, batch_size=1)
     embeddings, labels, images = compute_embeddings(model, dataloader, hparams)
 
-    mapper = UsedMapper(n_components=2).fit(embeddings)
+    mapper = UsedMapper(n_components=2, random_state=42).fit(embeddings)
     mapped = mapper.transform(embeddings)
     baselines = []
     baselines_images = []
@@ -136,10 +140,12 @@ def plot_means(embeddings, mapped, labels, images, name, token_list):
     plt.close()
     return means
 
+
 def save_embeddings(embeddings, name):
     embeddings_path = os.path.join(wandb.run.dir, f"{name}_embeddings.pt")
     torch.save(embeddings, embeddings_path)
     wandb.save(embeddings_path)
+
 
 def plot_dataset(dataset, mapped, baselines_mapped, labels, means, name):
     plot_embeddings(mapped, labels=np.array(
@@ -220,7 +226,7 @@ def plot_embeddings(embeddings, labels, baselines=[], xlim=None, ylim=None):
         t.set_visible(False)
 
 
-def compute_embeddings(model: LevelClassification, dataloader: DataLoader, hparams: Params, max_count=-1):
+def compute_embeddings(model: LevelClassification, dataloader: DataLoader, hparams: Params, max_count=0):
     embeddings = []
     labels = []
     outputs = []

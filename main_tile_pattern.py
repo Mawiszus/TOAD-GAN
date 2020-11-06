@@ -85,7 +85,7 @@ def main():
         colorize=True,
         format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level}</level> | <light-black>{file.path}:{line}</light-black> | {message}",
     )
-    hparams = Params(underscores_to_dashes=True).parse_args()
+    hparams = Params().parse_args()
     wandb.init(
         project=hparams.project,
         tags=hparams.tags,
@@ -100,15 +100,18 @@ def main():
     confusion_matrix_var_dict = {}
     level_names = []
     # The run directory is expected to contain samples from all levels
-    for run_dir in os.listdir(hparams.run_dir):
+    for run_dir in sorted(os.listdir(hparams.run_dir)):
+        if not os.path.isdir(os.path.join(hparams.run_dir, run_dir)):
+            continue
+        level_name = run_dir
         run_dir = os.path.join(hparams.run_dir, run_dir)
-        with open(os.path.join(run_dir, "files", "config.yaml"), "r") as f:
-            config = yaml.load(f)
-        test_level_dir = os.path.join(run_dir, "files", "test_samples", "txt")
-        if config["use_multiple_inputs"]["value"]:
-            level_name = "lvl_1-inputs" + "_a" + str(config["alpha"]["value"]) + ".txt"
-        else:
-            level_name = config["input_name"]["value"][:-4] + "_a" + str(config["alpha"]["value"]) + ".txt"
+        # with open(os.path.join(run_dir, "files", "config.yaml"), "r") as f:
+        #     config = yaml.load(f)
+        # test_level_dir = os.path.join(run_dir, "files", "test_samples", "txt")
+        # if config["use_multiple_inputs"]["value"]:
+        #     level_name = "lvl_1-inputs" + "_a" + str(config["alpha"]["value"]) + ".txt"
+        # else:
+        #     level_name = config["input_name"]["value"][:-4] + "_a" + str(config["alpha"]["value"]) + ".txt"
         level_names.append(level_name)
         divergences_mean = {}
         divergences_var = {}
@@ -120,7 +123,7 @@ def main():
                 level_name=current_level_name,
             )
             mean_kl_divergence, var_kl_divergence = compute_kl_divergence(
-                level_dataset, test_level_dir, hparams
+                level_dataset, run_dir, hparams
             )
             divergences_mean[current_level_name] = mean_kl_divergence
             divergences_var[current_level_name] = var_kl_divergence

@@ -20,7 +20,7 @@ def main():
     logger.add(sys.stdout, colorize=True, format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> " +
                                                  "| <level>{level}</level> " +
                                                  "| <light-black>{file.path}:{line}</light-black> | {message}")
-    hparams = Params(underscores_to_dashes=True).parse_args()
+    hparams = Params().parse_args()
     wandb.init(project=hparams.project, tags=hparams.tags)
     if not hparams.restore:
         logger.error(
@@ -31,12 +31,12 @@ def main():
     logger.info("Restored model")
     model.freeze()
     model.eval()
-    train_datasets = [LevelSnippetDataset(level_dir=os.path.join(os.getcwd(), hparams.level_dir),
+    train_datasets = [LevelSnippetDataset(level_dir=os.path.join(hparams.level_dir),
                                           slice_width=model.dataset.slice_width,
                                           token_list=model.dataset.token_list, level_name=level_name, debug=hparams.debug) for level_name in sorted(os.listdir(hparams.level_dir)) if level_name.endswith(".txt")]
-    test_datasets = [LevelSnippetDataset(level_dir=os.path.join(os.getcwd(), hparams.baseline_level_dir, level_name),
+    test_datasets = [LevelSnippetDataset(level_dir=os.path.join(hparams.baseline_level_dir, level_name),
                                          slice_width=model.dataset.slice_width,
-                                         token_list=model.dataset.token_list, debug=hparams.debug) for level_name in sorted(os.listdir(hparams.baseline_level_dir))]
+                                         token_list=model.dataset.token_list, debug=hparams.debug) for level_name in sorted(os.listdir(hparams.baseline_level_dir)) if os.path.isdir(os.path.join(hparams.baseline_level_dir, level_name))]
     display_labels = [dataset.level_name for dataset in train_datasets]
     train_datasets = [DataLoader(
         dataset, batch_size=512, num_workers=os.cpu_count() or 1) for dataset in train_datasets]

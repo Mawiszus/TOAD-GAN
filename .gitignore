@@ -13,3 +13,4 @@ slurm-*
 slurm_logs
 main.sh
 nobackup
+main_cpu.sh

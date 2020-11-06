@@ -12,3 +12,4 @@ slurm-*
 /input/umap_images/unused
 slurm_logs
 main.sh
+nobackup

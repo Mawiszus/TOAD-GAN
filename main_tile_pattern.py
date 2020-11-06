@@ -27,7 +27,7 @@ class Params(Tap):
     project: str = "mario"
     tags: List[str] = ["similarity"]
     job_type: str = "eval"
-    level_dir: str = "input"
+    level_dir: str = "input/mario"
 
 
 def pattern_key(level_slice):

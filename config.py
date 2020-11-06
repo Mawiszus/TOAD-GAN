@@ -23,7 +23,7 @@ class Config(Tap):
     netD: str = ""  # path to netD (to continue training)
     manualSeed: Optional[int] = None
     out: str = "output"  # output directory
-    input_dir: str = "input"  # input directory
+    input_dir: str = "input/mario"  # input directory
     input_name: str = "lvl_1-1.txt"  # input level filename
     # input level names (if multiple inputs are used)
     input_names: List[str] = ["lvl_1-1.txt", "lvl_1-2.txt"]

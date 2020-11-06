@@ -10,7 +10,7 @@ SPRITE_PATH = "./sprites"
 if __name__ == '__main__':
     ImgGen = LevelImageGen(SPRITE_PATH)
 
-    directory = '../input/'
+    directory = '../input/mario'
     dir_names = os.listdir(directory)
     dir_names.sort()
     if 'README.md' in dir_names:  # Ignore readme for default input folder

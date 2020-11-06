@@ -318,7 +318,8 @@ def generate_mario_samples(opt: GenerateSamplesConfig):
 
         # For embedding experiment, copy levels to easy access folder
         samples_dir = opt.out_ + '/' + s_dir_name_m + '/txt'
-        newpath = os.path.join(opt.generators_dir, opt.input_name[:-4])
+        newpath = os.path.join(
+            opt.generators_dir, "samples", opt.input_name[:-4])
         os.makedirs(newpath, exist_ok=True)
         for f in tqdm(os.listdir(samples_dir)):
             if f.endswith('.txt'):

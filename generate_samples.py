@@ -1,4 +1,6 @@
 from typing import Optional
+
+import yaml
 from config import Config
 import os
 from shutil import copyfile
@@ -33,7 +35,30 @@ from generate_noise import generate_spatial_noise
 from models import load_trained_pyramid
 
 
-def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Config, in_s=None, scale_v=1.0, scale_h=1.0,
+class GenerateSamplesConfig(Config):
+    out_: Optional[str] = None  # folder containing generator files
+    scale_v: float = 1.0  # vertical scale factor
+    scale_h: float = 1.0  # horizontal scale factor
+    gen_start_scale: int = 0  # scale to start generating in
+    num_samples: int = 10  # number of samples to be generated
+    save_tensors: bool = False  # save pytorch .pt tensors?
+    # make 1000 samples for each mario generator specified in the code.
+    make_mario_samples: bool = False
+    seed_mariokart_road: bool = False  # seed mariokart generators with a road image
+    # make token insert experiment (experimental!)
+    token_insert_experiment: bool = False
+    not_cuda: bool = False  # disables cuda
+    generators_dir: Optional[str] = None
+
+    def process_args(self):
+        super().process_args()
+        self.seed_road: Optional[torch.Tensor] = None
+        if (not self.out_) and (not self.make_mario_samples):
+            raise Exception(
+                '--out_ is required (--make_mario_samples experiment is the exception)')
+
+
+def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: GenerateSamplesConfig, in_s=None, scale_v=1.0, scale_h=1.0,
                      current_scale=0, gen_start_scale=0, num_samples=50, render_images=True, save_tensors=False,
                      save_dir="random_samples"):
     """
@@ -240,82 +265,41 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Confi
     return I_curr.detach()  # return last generated image (usually unused)
 
 
-def generate_mario_samples(opt_m):
+def generate_mario_samples(opt: GenerateSamplesConfig):
 
     # Generate many samples for all mario levels for large scale evaluation
-    level_names = [f for f in os.listdir("./input") if f.endswith('.txt')]
-    level_names.sort()
+    level_names = [f for f in sorted(os.listdir(
+        opt.input_dir)) if f.endswith('.txt')]
 
-    # Directory with saved runs
-    run_dir_m = "/home/awiszus/Project/TOAD-GAN/wandb/"
+    generator_dirs = {}
+    for generator_dir in os.listdir(opt.generators_dir):
+        run_dir = os.path.join(opt.generators_dir, generator_dir)
+        with open(os.path.join(run_dir, "files", "config.yaml"), "r") as f:
+            config = yaml.load(f)
+        level_name = config["input_name"]["value"]
+        generator_dirs[level_name] = os.path.join(run_dir, "files")
 
-    for generator_level in range(0, len(level_names)):
+    for level_name in level_names:
         # New "input" mario level
-        opt_m.input_name = level_names[generator_level]
-
-        # New "output" folder
-        if generator_level == 0:
-            opt_m.out_ = run_dir_m + \
-                "run-20200605_101920-21l6f6ke"  # level 1 (1-1)
-        elif generator_level == 1:
-            opt_m.out_ = run_dir_m + \
-                "run-20200609_141816-2cxsre2o"  # level 2 (1-2)
-        elif generator_level == 2:
-            opt_m.out_ = run_dir_m + \
-                "run-20200609_144802-30asxofq"  # level 3 (1-3)
-        elif generator_level == 3:
-            opt_m.out_ = run_dir_m + \
-                "run-20200616_082954-20htkyzv"  # level 4 (2-1)
-        elif generator_level == 4:
-            opt_m.out_ = run_dir_m + \
-                "run-20200616_074234-19xr2e3o"  # level 5 (3-1)
-        elif generator_level == 5:
-            opt_m.out_ = run_dir_m + \
-                "run-20200616_093747-2ulvs4fh"  # level 6 (3-3)
-        elif generator_level == 6:
-            opt_m.out_ = run_dir_m + \
-                "run-20200616_102830-flwggm0z"  # level 7 (4-1)
-        elif generator_level == 7:
-            opt_m.out_ = run_dir_m + \
-                "run-20200616_114258-1uwt2v80"  # level 8 (4-2)
-        elif generator_level == 8:
-            opt_m.out_ = run_dir_m + \
-                "run-20200618_072750-3mfpkr81"  # level 9 (5-1)
-        elif generator_level == 9:
-            opt_m.out_ = run_dir_m + \
-                "run-20200618_093240-3aeol9gd"  # level 10 (5-3)
-        elif generator_level == 10:
-            opt_m.out_ = run_dir_m + \
-                "run-20200618_125519-3r0bngi4"  # level 11 (6-1)
-        elif generator_level == 11:
-            opt_m.out_ = run_dir_m + \
-                "run-20200618_131406-2ai6f3cl"  # level 12 (6-2)
-        elif generator_level == 12:
-            opt_m.out_ = run_dir_m + \
-                "run-20200618_133803-bxjlb36v"  # level 13 (6-3)
-        elif generator_level == 13:
-            opt_m.out_ = run_dir_m + \
-                "run-20200619_074635-14l988af"  # level 14 (7-1)
-        elif generator_level == 14:
-            opt_m.out_ = run_dir_m + \
-                "run-20200619_094438-lo7f1hqb"  # level 15 (8-1)
+        opt.input_name = level_name
+        opt.out_ = generator_dirs[level_name]
 
         # Read level according to input arguments
-        real_m = read_level(opt_m, None, MARIO_REPLACE_TOKENS).to(opt_m.device)
+        real_m = read_level(opt, None, MARIO_REPLACE_TOKENS).to(opt.device)
 
         # Load TOAD-GAN for current level
         generators_m, noise_maps_m, reals_m, noise_amplitudes_m = load_trained_pyramid(
-            opt_m)
+            opt)
 
         # Set in_s and scales
-        if opt_m.gen_start_scale == 0:  # starting in lowest scale
+        if opt.gen_start_scale == 0:  # starting in lowest scale
             in_s_m = None
             m_scale_v = 1.0
             # normalize all levels to length 16x200
             m_scale_h = 200 / real_m.shape[-1]
         else:  # if opt.gen_start_scale > 0
             # Only works with default level size if no in_s is provided (should not be reached)
-            in_s_m = reals_m[opt_m.gen_start_scale]
+            in_s_m = reals_m[opt.gen_start_scale]
             m_scale_v = 1.0
             m_scale_h = 1.0
 
@@ -324,44 +308,22 @@ def generate_mario_samples(opt_m):
 
         # Define directory
         s_dir_name_m = "%s_random_samples_v%.5f_h%.5f_start%d" % (
-            prefix_m, m_scale_v, m_scale_h, opt_m.gen_start_scale)
+            prefix_m, m_scale_v, m_scale_h, opt.gen_start_scale)
 
         # Generate samples
-        generate_samples(generators_m, noise_maps_m, reals_m, noise_amplitudes_m, opt_m, in_s=in_s_m,
-                         scale_v=m_scale_v, scale_h=m_scale_h, current_scale=opt_m.gen_start_scale,
-                         gen_start_scale=opt_m.gen_start_scale, num_samples=1000, render_images=False,
+        generate_samples(generators_m, noise_maps_m, reals_m, noise_amplitudes_m, opt, in_s=in_s_m,
+                         scale_v=m_scale_v, scale_h=m_scale_h, current_scale=opt.gen_start_scale,
+                         gen_start_scale=opt.gen_start_scale, num_samples=1000, render_images=False,
                          save_tensors=False, save_dir=s_dir_name_m)
 
         # For embedding experiment, copy levels to easy access folder
-        samples_dir = opt_m.out_ + '/' + s_dir_name_m + '/txt'
-        newpath = "./input/umap_images/baselines/" + opt_m.input_name[:-4]
+        samples_dir = opt.out_ + '/' + s_dir_name_m + '/txt'
+        newpath = os.path.join(opt.generators_dir, opt.input_name[:-4])
         os.makedirs(newpath, exist_ok=True)
         for f in tqdm(os.listdir(samples_dir)):
             if f.endswith('.txt'):
                 copyfile(os.path.join(samples_dir, f),
                          os.path.join(newpath, f))
-
-
-class GenerateSamplesConfig(Config):
-    out_: str  # folder containing generator files
-    scale_v: float = 1.0  # vertical scale factor
-    scale_h: float = 1.0  # horizontal scale factor
-    gen_start_scale: int = 0  # scale to start generating in
-    num_samples: int = 10  # number of samples to be generated
-    save_tensors: bool = False  # save pytorch .pt tensors?
-    # make 1000 samples for each mario generator specified in the code.
-    make_mario_samples: bool = False
-    seed_mariokart_road: bool = False  # seed mariokart generators with a road image
-    # make token insert experiment (experimental!)
-    token_insert_experiment: bool = False
-    not_cuda: bool = False  # disables cuda
-
-    def process_args(self):
-        self.device = torch.device("cpu" if self.not_cuda else "cuda:0")
-        self.seed_road: Optional[torch.Tensor] = None
-        if (not self.out_) and (not self.make_mario_samples):
-            raise Exception(
-                '--out_ is required (--make_mario_samples experiment is the exception)')
 
 
 if __name__ == '__main__':
@@ -488,7 +450,7 @@ if __name__ == '__main__':
                 opt_fakes.input_name = "lvl_1-3.txt"
             elif seed_level == -1:  # seed with noise
                 opt_fakes.input_name = "lvl_1-1.txt"  # should not matter
-            opt_fakes.input_dir = "./input"
+            opt_fakes.input_dir = "./input/mario"
             real_fakes = read_level(opt_fakes).to(opt.device)
 
             # Downsample "other level"

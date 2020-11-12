@@ -33,6 +33,7 @@ class Params(LevelClassificationParams):
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     checkpoint_dir: Optional[str] = None
     restore_mapper: Optional[str] = None
+    seed: int = 42
 
 
 def main():
@@ -41,6 +42,9 @@ def main():
                                                  "| <level>{level}</level> " +
                                                  "| <light-black>{file.path}:{line}</light-black> | {message}")
     hparams = Params().parse_args()
+    torch.manual_seed(hparams.seed)
+    np.random.seed(hparams.seed)
+    torch.set_deterministic(True)
     run = wandb.init(project=hparams.project,
                      tags=hparams.tags, config=hparams.as_dict())
     if hparams.restore:
@@ -82,7 +86,7 @@ def visualize_embeddings(dataset: LevelSnippetDataset, model: LevelClassificatio
     dataloader = DataLoader(dataset, batch_size=1)
     embeddings, labels, images = compute_embeddings(model, dataloader, hparams)
     if not mapper:
-        mapper = UsedMapper(n_components=2, random_state=42).fit(embeddings)
+        mapper = UsedMapper(n_components=2, random_state=hparams.seed).fit(embeddings)
         dump(mapper, os.path.join(wandb.run.dir, "mapper.joblib"), compress=3)
     mapped = mapper.transform(embeddings)
     baselines = []

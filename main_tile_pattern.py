@@ -150,7 +150,7 @@ def main():
         confusion_matrix = np.array(confusion_matrix)
         sns.set(context="paper", style="white")
         confusion_display = ConfusionMatrixDisplay(
-            confusion_matrix, [name.split(".")[0] for name in level_names],
+            confusion_matrix, [name.split(".")[0].split("_")[-1] for name in level_names],
         )
         confusion_display.plot()
         ax = confusion_display.ax_

@@ -1,7 +1,7 @@
 import os
-from re import L
 import sys
 from typing import List, Optional
+from joblib import dump, load
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,10 +28,11 @@ class Params(LevelClassificationParams):
     project: str = "mario"
     tags: List[str] = []
     baseline_level_dir: str = "input/umap_images/baselines"
-    max_count: int = 700
+    max_count: int = 1000
     restore: Optional[str] = None
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     checkpoint_dir: Optional[str] = None
+    restore_mapper: Optional[str] = None
 
 
 def main():
@@ -40,15 +41,14 @@ def main():
                                                  "| <level>{level}</level> " +
                                                  "| <light-black>{file.path}:{line}</light-black> | {message}")
     hparams = Params().parse_args()
+    run = wandb.init(project=hparams.project,
+                     tags=hparams.tags, config=hparams.as_dict())
     if hparams.restore:
-        wandb.init(project=hparams.project, tags=hparams.tags)
         model = LevelClassification.load_from_checkpoint(hparams.restore)
         logger.info("Restored model")
     else:
-        # wandb.init is called in LevelClassification
         model = LevelClassification(hparams.as_dict())
-        experiment_logger = loggers.WandbLogger(
-            project=hparams.project, tags=hparams.tags)
+        experiment_logger = loggers.WandbLogger(experiment=run)
         hparams.checkpoint_dir = os.path.join(
             experiment_logger.experiment.dir, "checkpoints")
         checkpoint_cb = callbacks.ModelCheckpoint(
@@ -57,6 +57,10 @@ def main():
                              checkpoint_callback=checkpoint_cb, callbacks=[callbacks.EarlyStopping(monitor="val_loss")], fast_dev_run=hparams.debug
                              )
         trainer.fit(model)
+    if hparams.restore_mapper:
+        mapper = load(hparams.restore_mapper)
+    else:
+        mapper = None
     model.freeze()
     model.eval()
     baseline_datasets = []
@@ -70,14 +74,16 @@ def main():
                                                slice_width=model.dataset.slice_width,
                                                token_list=model.dataset.token_list, debug=hparams.debug)
         baseline_datasets.append(baseline_dataset)
-    visualize_embeddings(model.dataset, model, hparams, baseline_datasets)
+    visualize_embeddings(model.dataset, model, hparams,
+                         baseline_datasets, mapper)
 
 
-def visualize_embeddings(dataset: LevelSnippetDataset, model: LevelClassification, hparams: Params, baseline_datasets: List[LevelSnippetDataset] = []):
+def visualize_embeddings(dataset: LevelSnippetDataset, model: LevelClassification, hparams: Params, baseline_datasets: List[LevelSnippetDataset] = [], mapper=None):
     dataloader = DataLoader(dataset, batch_size=1)
     embeddings, labels, images = compute_embeddings(model, dataloader, hparams)
-
-    mapper = UsedMapper(n_components=2, random_state=42).fit(embeddings)
+    if not mapper:
+        mapper = UsedMapper(n_components=2, random_state=42).fit(embeddings)
+        dump(mapper, os.path.join(wandb.run.dir, "mapper.joblib"), compress=3)
     mapped = mapper.transform(embeddings)
     baselines = []
     baselines_images = []
@@ -226,7 +232,7 @@ def plot_embeddings(embeddings, labels, baselines=[], xlim=None, ylim=None):
         t.set_visible(False)
 
 
-def compute_embeddings(model: LevelClassification, dataloader: DataLoader, hparams: Params, max_count=0):
+def compute_embeddings(model: LevelClassification, dataloader: DataLoader, hparams: Params, max_count=-1):
     embeddings = []
     labels = []
     outputs = []

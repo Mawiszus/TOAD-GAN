@@ -49,8 +49,7 @@ class LevelClassification(pl.LightningModule):
     def __init__(self, hparams: Dict):
         super().__init__()
         self.save_hyperparameters()
-        self.params: LevelClassificationParams = LevelClassificationParams(
-            underscores_to_dashes=True).from_dict(hparams)
+        self.params: LevelClassificationParams = LevelClassificationParams().from_dict(hparams)
         self.dataset = LevelSnippetDataset(
             level_dir=self.params.level_dir, slice_width=self.params.slice_width, debug=self.params.debug)
         train_size = math.floor(self.params.train_split * len(self.dataset))

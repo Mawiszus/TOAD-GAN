@@ -12,11 +12,11 @@ from mario.level_snippet_dataset import LevelSnippetDataset
 
 class Config(Tap):
     baseline_level_dirs: str = "input/umap_images/baselines"
+    slice_width: int = 16
 
 
 def main():
     opt = Config().parse_args()
-    slice_width = 5
     token_list = ['!', '#', '%', '*', '-', '1', '2', '?', '@', 'B', 'C', 'E', 'K', 'L',
                   'Q', 'R', 'S', 'T', 'U', 'X', 'b', 'g', 'k', 'o', 'r', 't', 'y', '|']
 
@@ -26,7 +26,7 @@ def main():
                                                                       baseline_level_dir,
                                                                       # "random_samples", "txt"
                                                                       ),
-                                               slice_width=slice_width,
+                                               slice_width=opt.slice_width,
                                                token_list=token_list)
 
         loader = DataLoader(baseline_dataset, batch_size=os.cpu_count(

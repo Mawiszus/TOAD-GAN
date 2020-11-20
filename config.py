@@ -17,7 +17,7 @@ from megaman.level_image_gen import LevelImageGen as MegamanLevelGen
 
 class Config(Tap):
     game: Literal["mario", "mariokart", "megaman",
-                  "zelda"] = "mario"  # Which game is to be used?
+                  "zelda", "minecraft"] = "mario"  # Which game is to be used?
     not_cuda: bool = False  # disables cuda
     netG: str = ""  # path to netG (to continue training)
     netD: str = ""  # path to netD (to continue training)

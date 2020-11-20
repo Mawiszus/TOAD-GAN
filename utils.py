@@ -3,7 +3,7 @@ import random
 import numpy as np
 import torch
 import torchvision
-from torch.nn.functional import interpolate
+from torch.nn.functional import interpolate, grid_sample
 import matplotlib.pyplot as plt
 
 
@@ -60,3 +60,15 @@ def prepare_mnist_seed_images():
         tmp = tmp[x_1:x_2, y_1:y_2]
         # tmp = interpolate(tmp.unsqueeze(0).unsqueeze(0), (28, 28))
         plt.imsave('mariokart/seed_road/MNIST_examples/eights/sample_%d.png' % i, tmp[0][0], cmap='Greys')
+
+
+def interpolate3D(data, shape, mode='bilinear', align_corners=False):
+    d_1 = torch.linspace(-1, 1, shape[0])
+    d_2 = torch.linspace(-1, 1, shape[1])
+    d_3 = torch.linspace(-1, 1, shape[2])
+    meshz, meshy, meshx = torch.meshgrid((d_1, d_2, d_3))
+    grid = torch.stack((meshx, meshy, meshz), 3)
+    grid = grid.unsqueeze(0).to(data.device)
+
+    scaled = grid_sample(data, grid, mode=mode, align_corners=align_corners)
+    return scaled

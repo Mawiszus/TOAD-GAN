@@ -131,7 +131,7 @@ class TAG_Value(object):
         return "<%s name=\"%s\" value=%r>" % (str(self.__class__.__name__), self.name, self.value)
 
     def write_tag(self, buf):
-        buf.write(chr(self.tagID))
+        buf.write(chr(self.tagID).encode('utf-8'))
 
     def write_name(self, buf):
         if self.name is not None:
@@ -339,14 +339,14 @@ class TAG_Compound(TAG_Value, collections.MutableMapping):
         if self.name is None:
             self.name = ""
 
-        buf = StringIO()
+        buf = BytesIO()
         self.write_tag(buf)
         self.write_name(buf)
         self.write_value(buf)
         data = buf.getvalue()
 
         if compressed:
-            gzio = StringIO()
+            gzio = BytesIO()
             gz = gzip.GzipFile(fileobj=gzio, mode='wb')
             gz.write(data)
             gz.close()
@@ -367,7 +367,7 @@ class TAG_Compound(TAG_Value, collections.MutableMapping):
             tag.write_name(buf)
             tag.write_value(buf)
 
-        buf.write("\x00")
+        buf.write("\x00".encode('utf-8'))
 
     # --- collection functions ---
 
@@ -401,7 +401,7 @@ class TAG_Compound(TAG_Value, collections.MutableMapping):
 
         # remove any items already named "key".
         if not self.ALLOW_DUPLICATE_KEYS:
-            self._value = filter(lambda x: x.name != key, self._value)
+            self._value = list(filter(lambda x: x.name != key, self._value))
 
         self._value.append(item)
 
@@ -465,7 +465,7 @@ class TAG_List(TAG_Value, collections.MutableSequence):
         return self
 
     def write_value(self, buf):
-        buf.write(chr(self.list_type))
+        buf.write(chr(self.list_type).encode('utf-8'))
         buf.write(TAG_Int.fmt.pack(len(self.value)))
         for i in self.value:
             i.write_value(buf)

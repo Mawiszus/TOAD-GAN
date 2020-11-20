@@ -6,6 +6,7 @@ output/
 .history/
 __pycache__/
 tmp/
+minecraft/sprites/
 slurm-*
 /input/umap_images/baselines
 /input/umap_images/old_baselines

@@ -13,6 +13,8 @@ from zelda.special_zelda_downsampling import special_zelda_downsampling
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_utils import read_level, read_level_from_file
+from minecraft.level_utils import read_level as mc_read_level
+from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
 from config import Config
 from loguru import logger
 import wandb
@@ -60,25 +62,33 @@ def main():
         opt.ImgGen = ZeldaLevelGen(sprite_path)
         downsample = special_zelda_downsampling
     elif opt.game == 'megaman':
-        opt.ImgGen = MegamanLevelGen(
-            sprite_path, n_sheet=int(get_tags(opt)[0][-1]))
+        opt.ImgGen = MegamanLevelGen(sprite_path, n_sheet=int(get_tags(opt)[0][-1]))
         replace_tokens = MEGAMAN_REPLACE_TOKENS
         downsample = special_megaman_downsampling
     elif opt.game == 'mariokart':
         opt.ImgGen = MariokartLevelGen(sprite_path)
         replace_tokens = MARIOKART_REPLACE_TOKENS
         downsample = special_mariokart_downsampling
+    elif opt.game == 'minecraft':
+        opt.ImgGen = None
+        replace_tokens = None
+        downsample = special_minecraft_downsampling
     else:
-        NameError(
-            "name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
+        NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart, minecraft")
 
     # Read level according to input arguments
-    real = read_level(opt, None, replace_tokens)
+    if opt.game == 'minecraft':
+        real = mc_read_level(opt)
+    else:
+        real = read_level(opt, None, replace_tokens)
+
     if opt.use_multiple_inputs:
         for i, r in enumerate(real):
             real[i] = r.to(opt.device)
+        opt.level_shape = real[0].shape[2:]
     else:
         real = real.to(opt.device)
+        opt.level_shape = real.shape[2:]
 
     # Train!
     generators, noise_maps, reals, noise_amplitudes = train(real, opt)
@@ -99,16 +109,20 @@ def main():
     logger.info("Generating arbitrary sized random samples...")
     scale_v = 0.8  # Arbitrarily chosen scales
     scale_h = 0.4
+    scale_d = 0.5
     if opt.use_multiple_inputs:
         tmp_real = real[0]
     else:
         tmp_real = real
-    real_down = downsample(1, [[scale_v, scale_h]], tmp_real, opt.token_list)
+    if len(opt.level_shape) == 2:
+        real_down = downsample(1, [[scale_v, scale_h]], tmp_real, opt.token_list)
+    else:
+        real_down = downsample(1, [[scale_v, scale_h, scale_d]], tmp_real, opt.token_list)
     real_down = real_down[0]
     # necessary for correct input shape
     in_s = torch.zeros(real_down.shape, device=opt.device)
     generate_samples(generators, use_maps, use_reals, noise_amplitudes, opt, in_s=in_s,
-                     scale_v=scale_v, scale_h=scale_h, save_dir="arbitrary_random_samples")
+                     scale_v=scale_v, scale_h=scale_h, scale_d=scale_d, save_dir="arbitrary_random_samples")
 
 
 if __name__ == "__main__":

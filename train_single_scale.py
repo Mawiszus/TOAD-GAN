@@ -13,11 +13,13 @@ import wandb
 from draw_concat import draw_concat
 from generate_noise import generate_spatial_noise
 from mario.level_utils import group_to_token, one_hot_to_ascii_level, token_to_group
+from minecraft.level_utils import one_hot_to_blockdata_level, NanoMCSchematic
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
 from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
 from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from models import calc_gradient_penalty, save_networks
+from utils import interpolate3D
 
 
 def update_noise_amplitude(z_prev, real, opt):
@@ -57,17 +59,30 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
     else:
         real = reals[current_scale]
-        nzx = real.shape[2]  # Noise size x
-        nzy = real.shape[3]  # Noise size y
+        nz = real.shape[2:]
+        # nzx = real.shape[2]  # Noise size x
+        # nzy = real.shape[3]  # Noise size y
 
     padsize = int(1 * opt.num_layer)  # As kernel size is always 3 currently, padsize goes up by one per layer
 
     if not opt.pad_with_noise:
-        pad_noise = nn.ZeroPad2d(padsize)
-        pad_image = nn.ZeroPad2d(padsize)
+        if len(opt.level_shape) == 2:
+            pad_noise = nn.ZeroPad2d(padsize)
+            pad_image = nn.ZeroPad2d(padsize)
+        elif len(opt.level_shape) == 3:
+            pad_noise = nn.ConstantPad3d(padsize, 0)
+            pad_image = nn.ConstantPad3d(padsize, 0)
+        else:
+            raise NotImplementedError("Level Shape expected to be 2D or 3D.")
     else:
-        pad_noise = nn.ReflectionPad2d(padsize)
-        pad_image = nn.ReflectionPad2d(padsize)
+        if len(opt.level_shape) == 2:
+            pad_noise = nn.ReflectionPad2d(padsize)
+            pad_image = nn.ReflectionPad2d(padsize)
+        elif len(opt.level_shape) == 3:
+            pad_noise = nn.ReplicationPad3d(padsize)
+            pad_image = nn.ReplicationPad3d(padsize)
+        else:
+            raise NotImplementedError("Level Shape expected to be 2D or 3D.")
 
     # setup optimizer
     optimizerD = optim.Adam(D.parameters(), lr=opt.lr_d, betas=(opt.beta1, 0.999))
@@ -83,7 +98,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 z_opt = pad_noise(z_opt)
                 z_opt_group.append(z_opt)
         else:
-            z_opt = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
+            z_opt = generate_spatial_noise((1, opt.nc_current) + nz, device=opt.device)
             z_opt = pad_noise(z_opt)
     else:  # Add noise to previous output
         if opt.use_multiple_inputs:
@@ -93,7 +108,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 z_opt = pad_noise(z_opt)
                 z_opt_group.append(z_opt)
         else:
-            z_opt = torch.zeros([1, opt.nc_current, nzx, nzy]).to(opt.device)
+            z_opt = torch.zeros((1, opt.nc_current) + nz).to(opt.device)
             z_opt = pad_noise(z_opt)
 
     logger.info("Training at scale {}", current_scale)
@@ -118,7 +133,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 noise_group.append(noise_)
         else:
             group_steps = 1
-            noise_ = generate_spatial_noise([1, opt.nc_current, nzx, nzy], device=opt.device)
+            noise_ = generate_spatial_noise((1, opt.nc_current) + nz, device=opt.device)
             noise_ = pad_noise(noise_)
 
         for curr_inp in range(group_steps):
@@ -159,10 +174,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # train with fake
                 if (j == 0) & (epoch == 0):
                     if current_scale == 0:  # If we are in the lowest scale, noise is generated from scratch
-                        prev = torch.zeros(1, opt.nc_current, nzx, nzy).to(opt.device)
+                        prev = torch.zeros((1, opt.nc_current) + nz).to(opt.device)
                         prev_scale_results = prev
                         prev = pad_image(prev)
-                        z_prev = torch.zeros(1, opt.nc_current, nzx, nzy).to(opt.device)
+                        z_prev = torch.zeros((1, opt.nc_current) + nz).to(opt.device)
                         z_prev = pad_noise(z_prev)
                         opt.noise_amp = 1
                     else:  # First step in NOT the lowest scale
@@ -174,7 +189,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                         if current_scale == (opt.token_insert + 1):
                             prev = group_to_token(prev, opt.token_list, token_group)
 
-                        prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                        if len(opt.level_shape) == 2:
+                            prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                        else: # I'm assuming 2D/3D would have thrown exception by now
+                            prev = interpolate3D(prev, real.shape[-3:], mode="bilinear", align_corners=False)
                         prev = pad_image(prev)
                         z_prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, prev_scale_results,
                                              "rec", pad_noise, pad_image, opt)
@@ -183,7 +201,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                         if current_scale == (opt.token_insert + 1):
                             z_prev = group_to_token(z_prev, opt.token_list, token_group)
 
-                        z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                        if len(opt.level_shape) == 2:
+                            z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                        else:  # I'm assuming 2D/3D would have thrown exception by now
+                            z_prev = interpolate3D(z_prev, real.shape[-3:], mode="bilinear", align_corners=False)
                         opt.noise_amp = update_noise_amplitude(z_prev, real, opt)
                         z_prev = pad_image(z_prev)
                 else:  # Any other step
@@ -197,7 +218,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                     if current_scale == (opt.token_insert + 1):
                         prev = group_to_token(prev, opt.token_list, token_group)
 
-                    prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                    if len(opt.level_shape) == 2:
+                        prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                    else:  # I'm assuming 2D/3D would have thrown exception by now
+                        prev = interpolate3D(prev, real.shape[-3:], mode="bilinear", align_corners=False)
                     prev = pad_image(prev)
 
                 # After creating our correct noise input, we feed it to the generator:
@@ -292,21 +316,31 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             else:
                 token_list = opt.token_list
 
-            img = opt.ImgGen.render(one_hot_to_ascii_level(fake.detach(), token_list))
-            img2 = opt.ImgGen.render(one_hot_to_ascii_level(
-                G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1).detach(),
-                token_list))
-            real_scaled = one_hot_to_ascii_level(real.detach(), token_list)
-            img3 = opt.ImgGen.render(real_scaled)
-            wandb.log({f"G(z)@{current_scale}": wandb.Image(img),
-                       f"G(z_opt)@{current_scale}": wandb.Image(img2),
-                       f"real@{current_scale}": wandb.Image(img3)},
-                      sync=False, commit=False)
+            to_level = one_hot_to_ascii_level if opt.level_shape == 2 else one_hot_to_blockdata_level
 
-            real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.txt")
-            with open(real_scaled_path, "w") as f:
-                f.writelines(real_scaled)
-            wandb.save(real_scaled_path)
+            real_scaled = to_level(real.detach(), token_list)
+            if opt.ImgGen is not None:
+                img = opt.ImgGen.render(to_level(fake.detach(), token_list))
+                img2 = opt.ImgGen.render(to_level(
+                    G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1).detach(),
+                    token_list))
+                img3 = opt.ImgGen.render(real_scaled)
+                wandb.log({f"G(z)@{current_scale}": wandb.Image(img),
+                           f"G(z_opt)@{current_scale}": wandb.Image(img2),
+                           f"real@{current_scale}": wandb.Image(img3)},
+                          sync=False, commit=False)
+
+                real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.txt")
+                with open(real_scaled_path, "w") as f:
+                    f.writelines(real_scaled)
+                wandb.save(real_scaled_path)
+            else:
+                # Minecraft Schematic
+                real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.schematic")
+                new_schem = NanoMCSchematic(real_scaled_path, real_scaled.shape[:3])
+                new_schem.set_blockdata(real_scaled)
+                new_schem.saveToFile()
+                wandb.save(real_scaled_path)
 
             # Learning Rate scheduler step
             schedulerD.step()

@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 # sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))  # uncomment if opening form other dir
 
 from mario.level_utils import one_hot_to_ascii_level, group_to_token, token_to_group, read_level, read_level_from_file, place_a_mario_token
-from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from zelda.special_zelda_downsampling import special_zelda_downsampling
 from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
@@ -31,8 +30,11 @@ from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
 from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from mario.special_mario_downsampling import special_mario_downsampling
+from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
+from minecraft.level_utils import one_hot_to_blockdata_level, NanoMCSchematic
 from generate_noise import generate_spatial_noise
 from models import load_trained_pyramid
+from utils import interpolate3D
 
 
 class GenerateSamplesConfig(Config):
@@ -58,7 +60,7 @@ class GenerateSamplesConfig(Config):
                 '--out_ is required (--make_mario_samples experiment is the exception)')
 
 
-def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: GenerateSamplesConfig, in_s=None, scale_v=1.0, scale_h=1.0,
+def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: GenerateSamplesConfig, in_s=None, scale_v=1.0, scale_h=1.0, scale_d=1.0,
                      current_scale=0, gen_start_scale=0, num_samples=50, render_images=True, save_tensors=False,
                      save_dir="random_samples"):
     """
@@ -84,10 +86,16 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
         token_groups = MEGAMAN_TOKEN_GROUPS
     elif opt.game == 'mariokart':
         token_groups = MARIOKART_TOKEN_GROUPS
-    else:
+    elif opt.game == 'minecraft':
+        render_images = False  # can only save schematics so far
         token_groups = []
-        NameError(
-            "name of --game not recognized. Supported: mario, zelda, megaman, mariokart")
+    else:
+        raise NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart, minecraft")
+
+    if opt.game == 'minecraft': # easy setter for now, maybe make more general later
+        dim = 3
+    else:
+        dim = 2
 
     # Main sampling loop
     for sc, (G, Z_opt, noise_amp) in enumerate(zip(generators, noise_maps, noise_amplitudes)):
@@ -110,8 +118,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
             if opt.token_insert >= 0:
                 # Convert to ascii level
                 token_list = [list(group.keys())[0] for group in token_groups]
-                level = one_hot_to_ascii_level(
-                    in_s[0].detach().unsqueeze(0), token_list)
+                level = one_hot_to_ascii_level(in_s[0].detach().unsqueeze(0), token_list)
 
                 # Render and save level image
                 if render_images:
@@ -125,21 +132,40 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
         # Padding (should be chosen according to what was trained with)
         n_pad = int(1*opt.num_layer)
         if not opt.pad_with_noise:
-            m = nn.ZeroPad2d(int(n_pad))  # pad with zeros
+            if dim == 2:
+                m = nn.ZeroPad2d(int(n_pad))  # pad with zeros
+            else:
+                m = nn.ConstantPad3d(int(n_pad), 0)  # pad with zeros
         else:
-            m = nn.ReflectionPad2d(int(n_pad))  # pad with reflected noise
+            if dim == 2:
+                m = nn.ReflectionPad2d(int(n_pad))  # pad with reflected noise
+            else:
+                m = nn.ReplicationPad3d(int(n_pad))  # pad with reflected noise
 
         # Calculate shapes to generate
         if 0 < gen_start_scale <= current_scale:  # Special case! Can have a wildly different shape through in_s
-            scale_v = in_s.shape[-2] / \
-                (noise_maps[gen_start_scale-1].shape[-2] - n_pad * 2)
-            scale_h = in_s.shape[-1] / \
-                (noise_maps[gen_start_scale-1].shape[-1] - n_pad * 2)
-            nzx = (Z_opt.shape[-2] - n_pad * 2) * scale_v
-            nzy = (Z_opt.shape[-1] - n_pad * 2) * scale_h
+            nz = []
+            if dim == 2:
+                scale_v = in_s.shape[-2] / (noise_maps[gen_start_scale - 1].shape[-2] - n_pad * 2)
+                scale_h = in_s.shape[-1] / (noise_maps[gen_start_scale - 1].shape[-1] - n_pad * 2)
+                nz.append(int(round(((Z_opt.shape[-2] - n_pad * 2) * scale_v))))
+                nz.append(int(round(((Z_opt.shape[-1] - n_pad * 2) * scale_h))))
+            else:
+                scale_v = in_s.shape[-1] / (noise_maps[gen_start_scale - 1].shape[-1] - n_pad * 2)
+                scale_h = in_s.shape[-3] / (noise_maps[gen_start_scale - 1].shape[-3] - n_pad * 2)
+                scale_d = in_s.shape[-2] / (noise_maps[gen_start_scale - 1].shape[-2] - n_pad * 2)
+                nz.append(int(round(((Z_opt.shape[-3] - n_pad * 2) * scale_h))))
+                nz.append(int(round(((Z_opt.shape[-2] - n_pad * 2) * scale_d))))
+                nz.append(int(round(((Z_opt.shape[-1] - n_pad * 2) * scale_v))))  # mc ordering is y, z, x
         else:
-            nzx = (Z_opt.shape[-2] - n_pad * 2) * scale_v
-            nzy = (Z_opt.shape[-1] - n_pad * 2) * scale_h
+            nz = []
+            if dim == 2:
+                nz.append(int(round(((Z_opt.shape[-2] - n_pad * 2) * scale_v))))
+                nz.append(int(round(((Z_opt.shape[-1] - n_pad * 2) * scale_h))))
+            else:
+                nz.append(int(round(((Z_opt.shape[-3] - n_pad * 2) * scale_h))))
+                nz.append(int(round(((Z_opt.shape[-2] - n_pad * 2) * scale_d))))
+                nz.append(int(round(((Z_opt.shape[-1] - n_pad * 2) * scale_v))))  # mc ordering is y, z, x
 
         # Save list of images of previous scale and clear current images
         images_prev = images_cur
@@ -162,14 +188,13 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
             in_s = torch.zeros(reals[0].shape[0], channels,
                                *reals[0].shape[2:]).to(opt.device)
         elif in_s.sum() == 0:
-            in_s = torch.zeros(1, channels, *in_s.shape[-2:]).to(opt.device)
+            in_s = torch.zeros(1, channels, *in_s.shape[2:]).to(opt.device)
 
         # Generate num_samples samples in current scale
         for n in tqdm(range(0, num_samples, 1)):
 
             # Get noise image
-            z_curr = generate_spatial_noise(
-                [1, channels, int(round(nzx)), int(round(nzy))], device=opt.device)
+            z_curr = generate_spatial_noise((1, channels,) + tuple(nz), device=opt.device)
             z_curr = m(z_curr)
 
             # Set up previous image I_prev
@@ -183,8 +208,10 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     I_prev = group_to_token(
                         I_prev, opt.token_list, token_groups)
 
-            I_prev = interpolate(I_prev, [int(round(nzx)), int(
-                round(nzy))], mode='bilinear', align_corners=False)
+            if dim == 2:
+                I_prev = interpolate(I_prev, nz, mode='bilinear', align_corners=False)
+            else:
+                I_prev = interpolate3D(I_prev, nz, mode='bilinear', align_corners=False)
             I_prev = m(I_prev)
 
             # We take the optimized noise map Z_opt as an input if we start generating on later scales
@@ -228,8 +255,9 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
             # Save only last scale
             if current_scale == len(reals) - 1:
 
-                # Convert to ascii level
-                level = one_hot_to_ascii_level(I_curr.detach(), token_list)
+                # Convert to level
+                to_level = one_hot_to_ascii_level if dim == 2 else one_hot_to_blockdata_level
+                level = to_level(I_curr.detach(), token_list)
 
                 # Render and save level image
                 if render_images:
@@ -237,9 +265,16 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     img.save("%s/img/%d_sc%d.png" %
                              (dir2save, n, current_scale))
 
-                # Save level txt
-                with open("%s/txt/%d_sc%d.txt" % (dir2save, n, current_scale), "w") as f:
-                    f.writelines(level)
+                # Save level txt/schematic
+                if dim == 2:
+                    with open("%s/txt/%d_sc%d.txt" % (dir2save, n, current_scale), "w") as f:
+                        f.writelines(level)
+                else:
+                    # Minecraft Schematic
+                    save_path = "%s/txt/%d_sc%d.txt" % (dir2save, n, current_scale)
+                    new_schem = NanoMCSchematic(save_path, level.shape[:3])
+                    new_schem.set_blockdata(level)
+                    new_schem.saveToFile()
 
                 # Save torch tensor
                 if save_tensors:

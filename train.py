@@ -15,6 +15,7 @@ from mario.special_mario_downsampling import special_mario_downsampling
 from zelda.special_zelda_downsampling import special_zelda_downsampling
 from megaman.special_megaman_downsampling import special_megaman_downsampling
 from mariokart.special_mariokart_downsampling import special_mariokart_downsampling
+from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
 from models import init_models, reset_grads, restore_weights
 from models.generator import Level_GeneratorConcatSkip2CleanAdd
 from train_single_scale import train_single_scale
@@ -32,11 +33,17 @@ def train(real, opt: Config):
         token_group = ZELDA_TOKEN_GROUPS
     elif opt.game == 'megaman':
         token_group = MEGAMAN_TOKEN_GROUPS
+    elif opt.game == 'minecraft':
+        token_group = None
     else:  # if opt.game == 'mariokart':
         token_group = MARIOKART_TOKEN_GROUPS
 
-    scales = [[x, x] for x in opt.scales]
-    opt.num_scales = len(scales)
+    if opt.game == 'minecraft':
+        scales = [[x, x, x] for x in opt.scales]
+        opt.num_scales = len(scales)
+    else:
+        scales = [[x, x] for x in opt.scales]
+        opt.num_scales = len(scales)
 
     if opt.game == 'mario':
         downsampling = special_mario_downsampling
@@ -44,6 +51,8 @@ def train(real, opt: Config):
         downsampling = special_zelda_downsampling
     elif opt.game == 'megaman':
         downsampling = special_megaman_downsampling
+    elif opt.game == 'minecraft':
+        downsampling = special_minecraft_downsampling
     else:  # if opt.game == 'mariokart':
         downsampling = special_mariokart_downsampling
 
@@ -60,7 +69,7 @@ def train(real, opt: Config):
     # If (experimental) token grouping feature is used:
     if opt.token_insert >= 0:
         if opt.use_multiple_inputs:
-            NotImplementedError("Multiple inputs are not supported with token_insert")
+            raise NotImplementedError("Multiple inputs are not supported with token_insert")
         else:
             reals = [(token_to_group(r, opt.token_list, token_group) if i < opt.token_insert else r) for i, r in enumerate(reals)]
             reals.insert(opt.token_insert, token_to_group(reals[opt.token_insert], opt.token_list, token_group))
@@ -85,8 +94,9 @@ def train(real, opt: Config):
             os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
     else:
         # Default: One image
-        img = opt.ImgGen.render(one_hot_to_ascii_level(real, opt.token_list))
-        wandb.log({"real": wandb.Image(img)}, commit=False)
+        if opt.ImgGen is not None:
+            img = opt.ImgGen.render(one_hot_to_ascii_level(real, opt.token_list))
+            wandb.log({"real": wandb.Image(img)}, commit=False)
         os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
 
     # Training Loop

@@ -1,6 +1,6 @@
 import os
 
-from PIL import Image, ImageOps, ImageEnhance
+from PIL import Image, ImageOps, ImageEnhance, ImageDraw
 
 
 class LevelImageGen:
@@ -270,7 +270,7 @@ class LevelImageGen:
 
         return actual_sprite, (new_left, new_top, new_right, new_bottom)
 
-    def render(self, ascii_level):
+    def render(self, ascii_level, reachability_map=None):
         """ Renders the ascii level as a PIL Image. Assumes the Background is sky """
         len_level = len(ascii_level[-1])
         height_level = len(ascii_level)
@@ -287,5 +287,24 @@ class LevelImageGen:
                 curr_sprite = ascii_level[y][x]
                 sprite, box = self.prepare_sprite_and_box(ascii_level, curr_sprite, x, y)
                 dst.paste(sprite, box, mask=sprite)
+
+        # Mark reachable tiles
+        if reachability_map is not None:
+            # if reachable blocks are adjacent we want to outline the whole cluster of blocks
+            cluster_width = 1
+            for y in range(height_level):
+                for x in range(len_level):
+                    if reachability_map[y][x] == 1:
+                        # block already done in a previous cluster?
+                        if cluster_width > 1:
+                            cluster_width -= 1
+                        else:
+                            new_x = x + 1
+                            while new_x < len_level and reachability_map[y][new_x] == 1:
+                                cluster_width += 1
+                                new_x += 1
+
+                            draw = ImageDraw.Draw(dst)
+                            draw.rectangle(((x*16, y*16), ((x+cluster_width)*16, (y+1)*16)), outline="red")
 
         return dst

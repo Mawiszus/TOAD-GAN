@@ -271,7 +271,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         f.writelines(level)
                 else:
                     # Minecraft Schematic
-                    save_path = "%s/txt/%d_sc%d.txt" % (dir2save, n, current_scale)
+                    save_path = "%s/txt/%d_sc%d.schem" % (dir2save, n, current_scale)
                     new_schem = NanoMCSchematic(save_path, level.shape[:3])
                     new_schem.set_blockdata(level)
                     new_schem.saveToFile()

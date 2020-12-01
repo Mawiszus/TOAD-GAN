@@ -48,10 +48,12 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
         real_group = []
         nzx_group = []
         nzy_group = []
+        nz_group = []
         for scale_group in reals:
             real_group.append(scale_group[current_scale])
             nzx_group.append(scale_group[current_scale].shape[2])
             nzy_group.append(scale_group[current_scale].shape[3])
+            nz_group.append((scale_group[current_scale].shape[2], scale_group[current_scale].shape[3]))
 
         curr_noises = [0 for _ in range(len(real_group))]
         curr_prevs = [0 for _ in range(len(real_group))]
@@ -139,8 +141,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
         for curr_inp in range(group_steps):
             if opt.use_multiple_inputs:
                 real = real_group[curr_inp]
-                nzx = nzx_group[curr_inp]
-                nzy = nzy_group[curr_inp]
+                nz = nz_group[curr_inp]
                 z_opt = z_opt_group[curr_inp]
                 noise_ = noise_group[curr_inp]
                 prev_scale_results = input_from_prev_scale[curr_inp]
@@ -316,7 +317,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             else:
                 token_list = opt.token_list
 
-            to_level = one_hot_to_ascii_level if opt.level_shape == 2 else one_hot_to_blockdata_level
+            to_level = one_hot_to_ascii_level if len(opt.level_shape) == 2 else one_hot_to_blockdata_level
 
             real_scaled = to_level(real.detach(), token_list)
             if opt.ImgGen is not None:

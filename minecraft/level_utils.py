@@ -5,13 +5,15 @@ import numpy as np
 import os
 from loguru import logger
 
-import minecraft.nbt as nbt
+# import minecraft.nbt as nbt
+from PyAnvilEditor.pyanvil import World, BlockState, Canvas
 
 
 # Miscellaneous functions to deal with MC schematics.
 
 def load_schematic(path_to_schem):
     """ Loads a Minecraft .schem file """
+    '''
     sch = nbt.load(path_to_schem)
     # _Blocks is y, z, x
     blocks = sch["Blocks"].value.astype('uint16').reshape(sch["Height"].value, sch["Length"].value, sch["Width"].value)
@@ -20,11 +22,13 @@ def load_schematic(path_to_schem):
     blockdata = np.concatenate([blocks.reshape(blocks.shape + (1,)), data.reshape(data.shape + (1,))], axis=3)
 
     return blockdata
+    '''
 
 
 class NanoMCSchematic:
     def __init__(self, filename, shape, mats='Alpha'):
         """ We assume shape is already in yzx, unlike original code! """
+        '''
         self.filename = filename
         self.material = mats
         assert shape is not None
@@ -94,28 +98,44 @@ class NanoMCSchematic:
         del self.root_tag["Blocks"]
         del self.root_tag["Data"]
         self.root_tag.pop("AddBlocks", None)
+        '''
 
 
-def blockdata_to_one_hot_level(bdata, tokens) -> torch.Tensor:
-    """ Converts blockdata to a full token level tensor. """
-    oh_level = torch.zeros((len(tokens),) + bdata.shape[:-1])
-    for i, tok in enumerate(tokens):
-        overlap = bdata[:, :, :] == tok
-        true_pos = np.logical_and(overlap[:, :, :, 0], overlap[:, :, :, 1])
-        oh_level[i][true_pos] = 1
-
-    return oh_level
+# def blockdata_to_one_hot_level(bdata, tokens) -> torch.Tensor:
+#     """ Converts blockdata to a full token level tensor. """
+#     oh_level = torch.zeros((len(tokens),) + bdata.shape[:-1])
+#     for i, tok in enumerate(tokens):
+#         overlap = bdata[:, :, :] == tok
+#         true_pos = np.logical_and(overlap[:, :, :, 0], overlap[:, :, :, 1])
+#         oh_level[i][true_pos] = 1
+#
+#     return oh_level
 
 
 def one_hot_to_blockdata_level(oh_level, tokens):
     """ Converts a full token level tensor to blockdata. """
-    bdata = np.zeros(oh_level.shape[2:] + (2,), 'uint8')
+    bdata = np.zeros(oh_level.shape[2:], 'uint8')
     for y in range(bdata.shape[0]):
         for z in range(bdata.shape[1]):
             for x in range(bdata.shape[2]):
-                bdata[y, z, x] = tokens[oh_level[:, :, y, z, x].argmax()]
+                bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
 
     return bdata
+
+
+# def read_level_from_file(input_dir, input_name):
+#     """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.
+#     Token. """
+#     bdata = load_schematic(os.path.join(input_dir, input_name))
+#     uniques = set()
+#     for y in range(bdata.shape[0]):
+#         for z in range(bdata.shape[1]):
+#             for x in range(bdata.shape[2]):
+#                 uniques.add(tuple(bdata[y, z, x]))
+#     uniques = list(uniques)
+#     uniques.sort()  # necessary! otherwise we won't know the token order later
+#     oh_level = blockdata_to_one_hot_level(bdata, uniques)
+#     return oh_level.unsqueeze(dim=0), uniques
 
 
 def read_level(opt: Config):
@@ -123,23 +143,46 @@ def read_level(opt: Config):
     # If we have multiple levels as input, we need to sync the tokens
 
     # Default: Only one input level
-    level, uniques = read_level_from_file(opt.input_dir, opt.input_name)
+    # with World Files, we need the coords of our actual level
+    if not opt.coords:
+        opt.coords = ((0, 32), (32, 96), (0, 32))  # y, z, x
+
+    level, uniques = read_level_from_file(opt.input_dir, opt.input_name, opt.coords)
     opt.token_list = uniques
     logger.info("Tokens in level {}", opt.token_list)
     opt.nc_current = len(uniques)
     return level
 
 
-def read_level_from_file(input_dir, input_name):
-    """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.
-    Token. """
-    bdata = load_schematic(os.path.join(input_dir, input_name))
-    uniques = set()
-    for y in range(bdata.shape[0]):
-        for z in range(bdata.shape[1]):
-            for x in range(bdata.shape[2]):
-                uniques.add(tuple(bdata[y, z, x]))
-    uniques = list(uniques)
-    uniques.sort()  # necessary! otherwise we won't know the token order later
-    oh_level = blockdata_to_one_hot_level(bdata, uniques)
-    return oh_level.unsqueeze(dim=0), uniques
+def read_level_from_file(input_dir, input_name, coords, debug=False):
+    """ coords is ((y0,yend), (z0,zend), (x0,xend)) """
+    uniques = []
+    level = torch.zeros((coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
+    with World(input_name, input_dir, debug=debug) as wrld:
+        for j in range(coords[0][0], coords[0][1]):
+            for k in range(coords[1][0], coords[1][1]):
+                for l in range(coords[2][0], coords[2][1]):
+                    block = wrld.get_block((j, k, l))
+                    b_name = block.get_state().name
+                    if b_name not in uniques:
+                        uniques.append(b_name)
+                    level[j - coords[0][0], k - coords[1][0], l - coords[2][0]] = uniques.index(b_name)
+    oh_level = torch.zeros((1, len(uniques),) + level.shape)
+    for i, tok in enumerate(uniques):
+        oh_level[0, i] = (level == i)
+
+    return oh_level, uniques
+
+
+def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_list, debug=False):
+    with World(input_name, input_dir, debug=debug) as wrld:
+        # clear area with air
+        cvs = Canvas(wrld)
+        cvs.select_rectangle(start_coords, bdata_level.shape).fill(BlockState('minecraft:air', {}))
+        # fill area
+        for j in range(start_coords[0], start_coords[0] + bdata_level.shape[0]):
+            for k in range(start_coords[1], start_coords[1] + bdata_level.shape[1]):
+                for l in range(start_coords[2], start_coords[2] + bdata_level.shape[2]):
+                    block = wrld.get_block((j, k, l))
+                    actual_pos = (j-start_coords[0], k-start_coords[1], l-start_coords[2])
+                    block.set_state(BlockState(token_list[bdata_level[actual_pos]], {}))

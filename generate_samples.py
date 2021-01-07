@@ -31,7 +31,8 @@ from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from mario.special_mario_downsampling import special_mario_downsampling
 from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
-from minecraft.level_utils import one_hot_to_blockdata_level, NanoMCSchematic
+from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world
+from minecraft.level_utils import read_level as mc_read_level
 from generate_noise import generate_spatial_noise
 from models import load_trained_pyramid
 from utils import interpolate3D
@@ -41,6 +42,7 @@ class GenerateSamplesConfig(Config):
     out_: Optional[str] = None  # folder containing generator files
     scale_v: float = 1.0  # vertical scale factor
     scale_h: float = 1.0  # horizontal scale factor
+    scale_d: float = 1.0  # horizontal scale factor
     gen_start_scale: int = 0  # scale to start generating in
     num_samples: int = 10  # number of samples to be generated
     save_tensors: bool = False  # save pytorch .pt tensors?
@@ -92,7 +94,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
     else:
         raise NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart, minecraft")
 
-    if opt.game == 'minecraft': # easy setter for now, maybe make more general later
+    if opt.game == 'minecraft':  # easy setter for now, maybe make more general later
         dim = 3
     else:
         dim = 2
@@ -271,10 +273,13 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         f.writelines(level)
                 else:
                     # Minecraft Schematic
-                    save_path = "%s/txt/%d_sc%d.schem" % (dir2save, n, current_scale)
-                    new_schem = NanoMCSchematic(save_path, level.shape[:3])
-                    new_schem.set_blockdata(level)
-                    new_schem.saveToFile()
+                    # save_path = "%s/txt/%d_sc%d.schem" % (dir2save, n, current_scale)
+                    # new_schem = NanoMCSchematic(save_path, level.shape[:3])
+                    # new_schem.set_blockdata(level)
+                    # new_schem.saveToFile()
+                    # Minecraft World
+                    pos = n * (level.shape[0] + 5)
+                    save_level_to_world(opt.output_dir, opt.output_name, (pos, 0, 0), level, token_list)
 
                 # Save torch tensor
                 if save_tensors:
@@ -452,20 +457,30 @@ if __name__ == '__main__':
             replace_tokens = MEGAMAN_REPLACE_TOKENS
             downsample = special_megaman_downsampling
 
+        elif opt.game == 'minecraft':
+            opt.ImgGen = None
+            replace_tokens = None
+            downsample = special_minecraft_downsampling
+
         else:
             NameError(
-                "name of --game not recognized. Supported: mario, mariokart, zelda, megaman")
+                "name of --game not recognized. Supported: mario, mariokart, minecraft, zelda, megaman")
 
-        # Load level
-        real = read_level(opt, None, replace_tokens)
+        # Read level according to input arguments
+        if opt.game == 'minecraft':
+            real = mc_read_level(opt)
+        else:
+            real = read_level(opt, None, replace_tokens)
+
         if opt.use_multiple_inputs:
             real = real[0].to(opt.device)
+            opt.level_shape = real[0].shape[2:]
         else:
             real = real.to(opt.device)
+            opt.level_shape = real.shape[2:]
 
         # Load Generator
-        generators, noise_maps, reals, noise_amplitudes = load_trained_pyramid(
-            opt)
+        generators, noise_maps, reals, noise_amplitudes = load_trained_pyramid(opt)
 
         if opt.use_multiple_inputs:
             noise_maps = [m[0] for m in noise_maps]
@@ -522,8 +537,10 @@ if __name__ == '__main__':
             cur_scale = 0
 
             # Get input shape for in_s
-            real_down = downsample(
-                1, [[opt.scale_v, opt.scale_h]], real, opt.token_list)
+            if len(opt.level_shape) == 2:
+                real_down = downsample(1, [[opt.scale_v, opt.scale_h]], real, opt.token_list)
+            else:
+                real_down = downsample(1, [[opt.scale_v, opt.scale_h, opt.scale_d]], real, opt.token_list)
             real_down = real_down[0]
             in_s = torch.zeros_like(real_down, device=opt.device)
             prefix = "arbitrary"
@@ -533,5 +550,5 @@ if __name__ == '__main__':
             prefix, opt.scale_v, opt.scale_h, opt.gen_start_scale)
 
         generate_samples(generators, noise_maps, reals, noise_amplitudes, opt, in_s=in_s, save_tensors=opt.save_tensors,
-                         scale_v=opt.scale_v, scale_h=opt.scale_h, save_dir=s_dir_name, num_samples=opt.num_samples,
-                         current_scale=cur_scale)
+                         scale_v=opt.scale_v, scale_h=opt.scale_h, scale_d=opt.scale_d, save_dir=s_dir_name,
+                         num_samples=opt.num_samples, current_scale=cur_scale)

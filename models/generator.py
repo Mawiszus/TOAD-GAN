@@ -12,18 +12,26 @@ class Level_GeneratorConcatSkip2CleanAdd(nn.Module):
         super().__init__()
         self.is_cuda = torch.cuda.is_available()
         N = int(opt.nfc)
-        self.head = ConvBlock(opt.nc_current, N, (opt.ker_size, opt.ker_size), 0, 1)  # Padding is done externally
+        dim = len(opt.level_shape)
+        kernel = tuple(opt.ker_size for _ in range(dim))
+        self.head = ConvBlock(opt.nc_current, N, kernel, 0, 1, dim)  # Padding is done externally
         self.body = nn.Sequential()
 
         for i in range(opt.num_layer - 2):
-            block = ConvBlock(N, N, (opt.ker_size, opt.ker_size), 0, 1)
+            block = ConvBlock(N, N, kernel, 0, 1, dim)
             self.body.add_module("block%d" % (i + 1), block)
 
-        block = ConvBlock(N, N, (opt.ker_size, opt.ker_size), 0, 1)
+        block = ConvBlock(N, N, kernel, 0, 1, dim)
         self.body.add_module("block%d" % (opt.num_layer - 2), block)
 
-        self.tail = nn.Sequential(nn.Conv2d(N, opt.nc_current, kernel_size=(opt.ker_size, opt.ker_size),
-                                            stride=1, padding=0))
+        if dim == 2:
+            self.tail = nn.Sequential(nn.Conv2d(N, opt.nc_current, kernel_size=kernel,
+                                                stride=1, padding=0))
+        elif dim == 3:
+            self.tail = nn.Sequential(nn.Conv3d(N, opt.nc_current, kernel_size=kernel,
+                                                stride=1, padding=0))
+        else:
+            raise NotImplementedError("Can only make 2D or 3D Conv Layers.")
 
     def forward(self, x, y, temperature=1):
         x = self.head(x)
@@ -31,6 +39,12 @@ class Level_GeneratorConcatSkip2CleanAdd(nn.Module):
         x = self.tail(x)
         x = F.softmax(x * temperature, dim=1)  # Softmax is added here to allow for the temperature parameter
         ind = int((y.shape[2] - x.shape[2]) / 2)
-        y = y[:, :, ind:(y.shape[2] - ind), ind:(y.shape[3] - ind)]
+        if len(y.shape) == 4:
+            y = y[:, :, ind:(y.shape[2] - ind), ind:(y.shape[3] - ind)]
+        elif len(y.shape) == 5:
+            y = y[:, :, ind:(y.shape[2] - ind), ind:(y.shape[3] - ind), ind:(y.shape[4] - ind)]
+        else:
+            raise NotImplementedError("only supports 4D or 5D tensors")
+
         return x + y
 

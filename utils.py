@@ -1,5 +1,5 @@
 import random
-
+import pickle
 import numpy as np
 import torch
 import torchvision
@@ -72,3 +72,13 @@ def interpolate3D(data, shape, mode='bilinear', align_corners=False):
 
     scaled = grid_sample(data, grid, mode=mode, align_corners=align_corners)
     return scaled
+
+
+def save_pkl(obj, name, prepath='output/'):
+    with open(prepath + name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+
+
+def load_pkl(name, prepath='output/'):
+    with open(prepath + name + '.pkl', 'rb') as f:
+        return pickle.load(f)

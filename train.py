@@ -65,6 +65,9 @@ def train(real, opt: Config):
     else:
         scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list)
         reals = [*scaled_list, real]
+        print("Scaled Shapes:")
+        for r in reals:
+            print(r.shape)
 
     # If (experimental) token grouping feature is used:
     if opt.token_insert >= 0:

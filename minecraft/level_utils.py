@@ -3,6 +3,7 @@ from config import Config
 import torch
 import numpy as np
 import os
+import shutil
 from loguru import logger
 
 # import minecraft.nbt as nbt
@@ -145,7 +146,7 @@ def read_level(opt: Config):
     # Default: Only one input level
     # with World Files, we need the coords of our actual level
     if not opt.coords:
-        opt.coords = ((0, 32), (32, 96), (0, 32))  # y, z, x
+        opt.coords = ((0, 32), (0, 32), (0, 32))  # y, z, x
 
     level, uniques = read_level_from_file(opt.input_dir, opt.input_name, opt.coords)
     opt.token_list = uniques
@@ -177,8 +178,8 @@ def read_level_from_file(input_dir, input_name, coords, debug=False):
 def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_list, debug=False):
     with World(input_name, input_dir, debug=debug) as wrld:
         # clear area with air
-        cvs = Canvas(wrld)
-        cvs.select_rectangle(start_coords, bdata_level.shape).fill(BlockState('minecraft:air', {}))
+        # cvs = Canvas(wrld)
+        # cvs.select_rectangle(start_coords, bdata_level.shape).fill(BlockState('minecraft:air', {}))
         # fill area
         for j in range(start_coords[0], start_coords[0] + bdata_level.shape[0]):
             for k in range(start_coords[1], start_coords[1] + bdata_level.shape[1]):
@@ -186,3 +187,11 @@ def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_
                     block = wrld.get_block((j, k, l))
                     actual_pos = (j-start_coords[0], k-start_coords[1], l-start_coords[2])
                     block.set_state(BlockState(token_list[bdata_level[actual_pos]], {}))
+
+
+def clear_empty_world(worlds_folder, empty_world_name='Curr_Empty_World'):
+    src = os.path.join(worlds_folder, 'Empty_World')
+    dst = os.path.join(worlds_folder, empty_world_name)
+    shutil.rmtree(dst)
+    shutil.copytree(src, dst)
+

@@ -36,7 +36,7 @@ class Config(Tap):
     nfc: int = 64  # number of filters for conv layers
     ker_size: int = 3  # kernel size for conv layers
     num_layer: int = 3  # number of layers
-    scales: List[float] = [0.88, 0.75, 0.5]  # Scales descending (< 1 and > 0)
+    scales: List[float] = [0.75, 0.5, 0.25]  # Scales descending (< 1 and > 0)
     noise_update: float = 0.1  # additive noise weight
     # use reflection padding? (makes edges random)
     pad_with_noise: bool = False

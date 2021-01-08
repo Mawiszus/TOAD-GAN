@@ -13,7 +13,7 @@ import wandb
 from draw_concat import draw_concat
 from generate_noise import generate_spatial_noise
 from mario.level_utils import group_to_token, one_hot_to_ascii_level, token_to_group
-from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world
+from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
 from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
 from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
@@ -41,8 +41,13 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
         token_group = ZELDA_TOKEN_GROUPS
     elif opt.game == 'megaman':
         token_group = MEGAMAN_TOKEN_GROUPS
-    else:  # if opt.game == 'mariokart':
+    elif opt.game == 'mariokart':
         token_group = MARIOKART_TOKEN_GROUPS
+    elif opt.game == 'mincraft':
+        token_group = None
+        clear_empty_world(opt.output_dir, 'Curr_Empty_World')  # reset tmp world
+    else:  # Minecraft?
+        token_group = None
 
     if opt.use_multiple_inputs:
         real_group = []
@@ -343,6 +348,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # new_schem.saveToFile()
                 # wandb.save(real_scaled_path)
                 # Minecraft World
+                clear_empty_world(opt.output_dir, 'Curr_Empty_World')  # reset tmp world
                 to_render = [real_scaled, to_level(fake.detach(), token_list),
                              to_level(G(Z_opt.detach(), z_prev), token_list)]
                 for n, level in enumerate(to_render):

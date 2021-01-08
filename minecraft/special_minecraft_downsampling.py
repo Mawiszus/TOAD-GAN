@@ -23,7 +23,7 @@ def special_minecraft_downsampling(num_scales, scales, data, token_list):
     token_list : list of IDs appearing in the image in order of channels from data.
     """
 
-    cf_doc = load_pkl('test_counts', prepath='minecraft/chunk_frequencies/')
+    cf_doc = load_pkl('primordial_counts', prepath='minecraft/chunk_frequencies/')
     bf_icf_list = torch.zeros((len(token_list),), device=data.device)
     for i, token in enumerate(token_list):
         bf_icf_list[i] = bf_icf(i, data, cf_doc, token_list)

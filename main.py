@@ -14,6 +14,7 @@ from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_utils import read_level, read_level_from_file
 from minecraft.level_utils import read_level as mc_read_level
+from minecraft.level_utils import clear_empty_world
 from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
 from config import Config
 from loguru import logger
@@ -72,6 +73,7 @@ def main():
     elif opt.game == 'minecraft':
         opt.ImgGen = None
         replace_tokens = None
+        clear_empty_world(opt.output_dir, opt.output_name)
         downsample = special_minecraft_downsampling
     else:
         NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart, minecraft")

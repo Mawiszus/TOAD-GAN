@@ -31,7 +31,7 @@ from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from mario.special_mario_downsampling import special_mario_downsampling
 from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
-from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world
+from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world
 from minecraft.level_utils import read_level as mc_read_level
 from generate_noise import generate_spatial_noise
 from models import load_trained_pyramid
@@ -137,7 +137,8 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
             if dim == 2:
                 m = nn.ZeroPad2d(int(n_pad))  # pad with zeros
             else:
-                m = nn.ConstantPad3d(int(n_pad), 0)  # pad with zeros
+                # m = nn.ConstantPad3d(int(n_pad), 0)  # pad with zeros
+                m = nn.ReplicationPad3d(int(n_pad))  # pad with reflected noise
         else:
             if dim == 2:
                 m = nn.ReflectionPad2d(int(n_pad))  # pad with reflected noise
@@ -180,7 +181,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                 old_in_s = in_s
                 in_s = token_to_group(in_s, opt.token_list, token_groups)
         else:
-            channels = len(opt.token_list)
+            channels = reals[0].shape[1]
             if in_s is not None and in_s.shape[1] != channels:
                 old_in_s = in_s
                 in_s = group_to_token(in_s, opt.token_list, token_groups)
@@ -211,9 +212,9 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         I_prev, opt.token_list, token_groups)
 
             if dim == 2:
-                I_prev = interpolate(I_prev, nz, mode='bilinear', align_corners=False)
+                I_prev = interpolate(I_prev, nz, mode='bilinear', align_corners=True)
             else:
-                I_prev = interpolate3D(I_prev, nz, mode='bilinear', align_corners=False)
+                I_prev = interpolate3D(I_prev, nz, mode='bilinear', align_corners=True)
             I_prev = m(I_prev)
 
             # We take the optimized noise map Z_opt as an input if we start generating on later scales
@@ -259,20 +260,21 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
 
                 # Convert to level
                 to_level = one_hot_to_ascii_level if dim == 2 else one_hot_to_blockdata_level
-                level = to_level(I_curr.detach(), token_list)
-
-                # Render and save level image
-                if render_images:
-                    img = opt.ImgGen.render(level)
-                    img.save("%s/img/%d_sc%d.png" %
-                             (dir2save, n, current_scale))
 
                 # Save level txt/schematic
                 if dim == 2:
+                    level = to_level(I_curr.detach(), token_list)
+                    # Render and save level image
+                    if render_images:
+                        img = opt.ImgGen.render(level)
+                        img.save("%s/img/%d_sc%d.png" %
+                                 (dir2save, n, current_scale))
+
                     with open("%s/txt/%d_sc%d.txt" % (dir2save, n, current_scale), "w") as f:
                         f.writelines(level)
                 else:
                     # Minecraft Schematic
+                    level = to_level(I_curr.detach(), token_list, opt.block2repr)
                     # save_path = "%s/txt/%d_sc%d.schem" % (dir2save, n, current_scale)
                     # new_schem = NanoMCSchematic(save_path, level.shape[:3])
                     # new_schem.set_blockdata(level)
@@ -460,6 +462,7 @@ if __name__ == '__main__':
         elif opt.game == 'minecraft':
             opt.ImgGen = None
             replace_tokens = None
+            clear_empty_world(opt.output_dir, opt.output_name)
             downsample = special_minecraft_downsampling
 
         else:

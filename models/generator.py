@@ -8,9 +8,10 @@ from .conv_block import ConvBlock
 
 class Level_GeneratorConcatSkip2CleanAdd(nn.Module):
     """ Patch based Generator. Uses namespace opt. """
-    def __init__(self, opt):
+    def __init__(self, opt, use_softmax=True):
         super().__init__()
         self.is_cuda = torch.cuda.is_available()
+        self.use_softmax = use_softmax
         N = int(opt.nfc)
         dim = len(opt.level_shape)
         kernel = tuple(opt.ker_size for _ in range(dim))
@@ -25,11 +26,23 @@ class Level_GeneratorConcatSkip2CleanAdd(nn.Module):
         self.body.add_module("block%d" % (opt.num_layer - 2), block)
 
         if dim == 2:
-            self.tail = nn.Sequential(nn.Conv2d(N, opt.nc_current, kernel_size=kernel,
-                                                stride=1, padding=0))
+            if use_softmax:
+                self.tail = nn.Sequential(nn.Conv2d(N, opt.nc_current, kernel_size=kernel,
+                                                    stride=1, padding=0))
+            else:
+                self.tail = nn.Sequential(
+                    nn.Conv2d(N, opt.nc_current, kernel_size=kernel, stride=1, padding=0),
+                    # nn.ReLU()
+                )
         elif dim == 3:
-            self.tail = nn.Sequential(nn.Conv3d(N, opt.nc_current, kernel_size=kernel,
-                                                stride=1, padding=0))
+            if use_softmax:
+                self.tail = nn.Sequential(nn.Conv3d(N, opt.nc_current, kernel_size=kernel,
+                                                    stride=1, padding=0))
+            else:
+                self.tail = nn.Sequential(
+                    nn.Conv3d(N, opt.nc_current, kernel_size=kernel, stride=1, padding=0),
+                    # nn.ReLU()
+                )
         else:
             raise NotImplementedError("Can only make 2D or 3D Conv Layers.")
 
@@ -37,7 +50,8 @@ class Level_GeneratorConcatSkip2CleanAdd(nn.Module):
         x = self.head(x)
         x = self.body(x)
         x = self.tail(x)
-        x = F.softmax(x * temperature, dim=1)  # Softmax is added here to allow for the temperature parameter
+        if self.use_softmax:
+            x = F.softmax(x * temperature, dim=1)  # Softmax is added here to allow for the temperature parameter
         ind = int((y.shape[2] - x.shape[2]) / 2)
         if len(y.shape) == 4:
             y = y[:, :, ind:(y.shape[2] - ind), ind:(y.shape[3] - ind)]

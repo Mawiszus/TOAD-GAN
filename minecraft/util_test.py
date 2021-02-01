@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from loguru import logger
 
-from minecraft.level_utils import load_schematic, NanoMCSchematic, read_level_from_file
+from minecraft.level_utils import load_schematic, NanoMCSchematic, read_level_from_file, one_hot_to_blockdata_level
 
 if __name__ == '__main__':
     # fname = "input/minecraft/test.schematic"
@@ -26,11 +26,14 @@ if __name__ == '__main__':
     # new_schem.saveToFile()
 
     # New format with PyAnvil
-    wrld_name = "Test_1_16"
+    wrld_name = "Drehmal v2.1 PRIMORDIAL"
     wrld_dir = "/home/awiszus/Project/minecraft_worlds/"
-    coords = ((0, 16), (0, 128), (0, 16))
+    # coords = ((0, 16), (0, 128), (0, 16))
+    coords = ((1028, 1076), (60, 80), (1088, 1127))  # y, z, x
     oh_data, uniques = read_level_from_file(wrld_dir, wrld_name, coords)
     print(oh_data.shape)
     print(oh_data.min(), oh_data.max())
+
+    b_data = one_hot_to_blockdata_level(oh_data, uniques)
 
     print("Done")

@@ -77,8 +77,10 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             pad_noise = nn.ZeroPad2d(padsize)
             pad_image = nn.ZeroPad2d(padsize)
         elif len(opt.level_shape) == 3:
-            pad_noise = nn.ConstantPad3d(padsize, 0)
-            pad_image = nn.ConstantPad3d(padsize, 0)
+            # pad_noise = nn.ConstantPad3d(padsize, 0)
+            # pad_image = nn.ConstantPad3d(padsize, 0)
+            pad_noise = nn.ReplicationPad3d(padsize)
+            pad_image = nn.ReplicationPad3d(padsize)
         else:
             raise NotImplementedError("Level Shape expected to be 2D or 3D.")
     else:
@@ -196,9 +198,9 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                             prev = group_to_token(prev, opt.token_list, token_group)
 
                         if len(opt.level_shape) == 2:
-                            prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                            prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=True)
                         else: # I'm assuming 2D/3D would have thrown exception by now
-                            prev = interpolate3D(prev, real.shape[-3:], mode="bilinear", align_corners=False)
+                            prev = interpolate3D(prev, real.shape[-3:], mode="bilinear", align_corners=True)
                         prev = pad_image(prev)
                         z_prev = draw_concat(generators, noise_maps, reals, noise_amplitudes, prev_scale_results,
                                              "rec", pad_noise, pad_image, opt)
@@ -208,9 +210,9 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                             z_prev = group_to_token(z_prev, opt.token_list, token_group)
 
                         if len(opt.level_shape) == 2:
-                            z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=False)
+                            z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=True)
                         else:  # I'm assuming 2D/3D would have thrown exception by now
-                            z_prev = interpolate3D(z_prev, real.shape[-3:], mode="bilinear", align_corners=False)
+                            z_prev = interpolate3D(z_prev, real.shape[-3:], mode="bilinear", align_corners=True)
                         opt.noise_amp = update_noise_amplitude(z_prev, real, opt)
                         z_prev = pad_image(z_prev)
                 else:  # Any other step
@@ -324,8 +326,8 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
             to_level = one_hot_to_ascii_level if len(opt.level_shape) == 2 else one_hot_to_blockdata_level
 
-            real_scaled = to_level(real.detach(), token_list)
             if opt.ImgGen is not None:
+                real_scaled = to_level(real.detach(), token_list)
                 img = opt.ImgGen.render(to_level(fake.detach(), token_list))
                 img2 = opt.ImgGen.render(to_level(
                     G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1).detach(),
@@ -341,6 +343,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                     f.writelines(real_scaled)
                 wandb.save(real_scaled_path)
             else:
+                real_scaled = to_level(real.detach(), token_list, opt.block2repr)
                 # Minecraft Schematic
                 # real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.schematic")
                 # new_schem = NanoMCSchematic(real_scaled_path, real_scaled.shape[:3])
@@ -349,8 +352,8 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # wandb.save(real_scaled_path)
                 # Minecraft World
                 clear_empty_world(opt.output_dir, 'Curr_Empty_World')  # reset tmp world
-                to_render = [real_scaled, to_level(fake.detach(), token_list),
-                             to_level(G(Z_opt.detach(), z_prev), token_list)]
+                to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr),
+                             to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr)]
                 for n, level in enumerate(to_render):
                     pos = n * (level.shape[0] + 5)
                     save_level_to_world(opt.output_dir, 'Curr_Empty_World', (pos, 0, 0), level, token_list)

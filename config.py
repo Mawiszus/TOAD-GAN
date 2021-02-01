@@ -8,7 +8,7 @@ import torch
 from torch import cuda
 from tap import Tap
 
-from utils import set_seed
+from utils import set_seed, load_pkl
 from mariokart.level_image_gen import LevelImageGen as MariokartLevelGen
 from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
@@ -53,6 +53,14 @@ class Config(Tap):
     token_insert: int = -2
     token_list: List[str] = ['!', '#', '-', '1', '@', 'C', 'S',
                              'U', 'X', 'g', 'k', 't']  # default list of 1-1
+
+    def __init__(self,
+                 *args,
+                 underscores_to_dashes: bool = False,
+                 explicit_bool: bool = False,
+                 **kwargs):
+        super().__init__(args, underscores_to_dashes, explicit_bool, kwargs)
+        self.block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
 
     def process_args(self):
         self.device = torch.device("cpu" if self.not_cuda else "cuda:0")

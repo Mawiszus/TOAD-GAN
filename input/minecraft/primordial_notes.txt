@@ -1,0 +1,5 @@
+### Includes notes about the Primordial World, like interesting locations ###
+
+- Ruins in a Forest:
+XYZ: 1028 64 1088
+     1076 74 1127

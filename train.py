@@ -5,6 +5,7 @@ import os
 import torch
 import wandb
 from tqdm import tqdm
+import math
 
 from mario.level_utils import one_hot_to_ascii_level, token_to_group
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
@@ -19,6 +20,16 @@ from minecraft.special_minecraft_downsampling import special_minecraft_downsampl
 from models import init_models, reset_grads, restore_weights
 from models.generator import Level_GeneratorConcatSkip2CleanAdd
 from train_single_scale import train_single_scale
+
+
+def calc_lowest_possible_scale(level, kernel_size, num_layers):
+    needed_pad = math.floor(kernel_size/2) * num_layers
+    min_size = (needed_pad * 2) + 2
+    sizes = level.shape[2:]
+    lowest_scales = []
+    for dim in sizes:
+        lowest_scales.append(min_size/dim)
+    return lowest_scales
 
 
 def train(real, opt: Config):
@@ -38,11 +49,23 @@ def train(real, opt: Config):
     else:  # if opt.game == 'mariokart':
         token_group = MARIOKART_TOKEN_GROUPS
 
+    min_scales = calc_lowest_possible_scale(real, opt.ker_size, opt.num_layer)
+
     if opt.game == 'minecraft':
-        scales = [[x, x, x] for x in opt.scales]
+        scales = []
+        print('Scale Info:')
+        for x in opt.scales:
+            scales.append([max(x, min_scales[0]), max(x, min_scales[1]), max(x, min_scales[2])])
+        # scales = [[x, x, x] for x in opt.scales]
+        print(scales)
         opt.num_scales = len(scales)
     else:
-        scales = [[x, x] for x in opt.scales]
+        scales = []
+        print('Scale Info:')
+        for x in opt.scales:
+            scales.append([max(x, min_scales[0]), max(x, min_scales[1])])
+        # scales = [[x, x] for x in opt.scales]
+        print(scales)
         opt.num_scales = len(scales)
 
     if opt.game == 'mario':
@@ -114,10 +137,16 @@ def train(real, opt: Config):
         if current_scale < (opt.token_insert + 1):  # (stop_scale - 1):
             opt.nc_current = len(token_group)
         else:
-            opt.nc_current = len(opt.token_list)
+            opt.nc_current = real.shape[1]
+
+        # If it's the last scale, we need softmax, otherwise not
+        if current_scale < (stop_scale-1):
+            use_softmax = False  # if true, always softmax
+        else:
+            use_softmax = False  # if both false, never softmax (useful if repr are used)
 
         # Initialize models
-        D, G = init_models(opt)
+        D, G = init_models(opt, use_softmax)
         # If we are seeding, the weights after the seed need to be adjusted
         if current_scale == (opt.token_insert + 1):  # (stop_scale - 1):
             D, G = restore_weights(D, G, current_scale, opt)

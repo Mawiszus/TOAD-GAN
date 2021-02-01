@@ -105,26 +105,26 @@ def main():
         use_reals = reals
         use_maps = noise_maps
     generate_samples(generators, use_maps, use_reals,
-                     noise_amplitudes, opt, in_s=in_s)
+                     noise_amplitudes, opt, num_samples=4, in_s=in_s)
 
     # Generate samples of smaller size than level
-    logger.info("Generating arbitrary sized random samples...")
-    scale_v = 0.8  # Arbitrarily chosen scales
-    scale_h = 0.4
-    scale_d = 0.5
-    if opt.use_multiple_inputs:
-        tmp_real = real[0]
-    else:
-        tmp_real = real
-    if len(opt.level_shape) == 2:
-        real_down = downsample(1, [[scale_v, scale_h]], tmp_real, opt.token_list)
-    else:
-        real_down = downsample(1, [[scale_v, scale_h, scale_d]], tmp_real, opt.token_list)
-    real_down = real_down[0]
-    # necessary for correct input shape
-    in_s = torch.zeros(real_down.shape, device=opt.device)
-    generate_samples(generators, use_maps, use_reals, noise_amplitudes, opt, in_s=in_s,
-                     scale_v=scale_v, scale_h=scale_h, scale_d=scale_d, save_dir="arbitrary_random_samples")
+    # logger.info("Generating arbitrary sized random samples...")
+    # scale_v = 0.8  # Arbitrarily chosen scales
+    # scale_h = 0.4
+    # scale_d = 0.5
+    # if opt.use_multiple_inputs:
+    #     tmp_real = real[0]
+    # else:
+    #     tmp_real = real
+    # if len(opt.level_shape) == 2:
+    #     real_down = downsample(1, [[scale_v, scale_h]], tmp_real, opt.token_list)
+    # else:
+    #     real_down = downsample(1, [[scale_v, scale_h, scale_d]], tmp_real, opt.token_list)
+    # real_down = real_down[0]
+    # # necessary for correct input shape
+    # in_s = torch.zeros(real_down.shape, device=opt.device)
+    # generate_samples(generators, use_maps, use_reals, noise_amplitudes, opt, in_s=in_s, num_samples=5,
+    #                  scale_v=scale_v, scale_h=scale_h, scale_d=scale_d, save_dir="arbitrary_random_samples")
 
 
 if __name__ == "__main__":

@@ -343,7 +343,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                     f.writelines(real_scaled)
                 wandb.save(real_scaled_path)
             else:
-                real_scaled = to_level(real.detach(), token_list, opt.block2repr)
+                real_scaled = to_level(real.detach(), token_list, opt.block2repr, opt.repr_type)
                 # Minecraft Schematic
                 # real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.schematic")
                 # new_schem = NanoMCSchematic(real_scaled_path, real_scaled.shape[:3])
@@ -352,8 +352,8 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # wandb.save(real_scaled_path)
                 # Minecraft World
                 clear_empty_world(opt.output_dir, 'Curr_Empty_World')  # reset tmp world
-                to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr),
-                             to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr)]
+                to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr, opt.repr_type),
+                             to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr, opt.repr_type)]
                 for n, level in enumerate(to_render):
                     pos = n * (level.shape[0] + 5)
                     save_level_to_world(opt.output_dir, 'Curr_Empty_World', (pos, 0, 0), level, token_list)

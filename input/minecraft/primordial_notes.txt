@@ -3,3 +3,7 @@
 - Ruins in a Forest:
 XYZ: 1028 64 1088
      1076 74 1127
+
+- Old Guard Fortress:
+XYZ: -1735 146 1861
+     -1673 182 1902

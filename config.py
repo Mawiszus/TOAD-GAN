@@ -13,6 +13,7 @@ from mariokart.level_image_gen import LevelImageGen as MariokartLevelGen
 from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from megaman.level_image_gen import LevelImageGen as MegamanLevelGen
+from minecraft.block_autoencoder import Encoder, Decoder
 
 
 class Config(Tap):
@@ -54,13 +55,14 @@ class Config(Tap):
     token_list: List[str] = ['!', '#', '-', '1', '@', 'C', 'S',
                              'U', 'X', 'g', 'k', 't']  # default list of 1-1
 
+    repr_type: str = None  # Which representation type to use, currently [None, block2vec, autoencoder]
+
     def __init__(self,
                  *args,
                  underscores_to_dashes: bool = False,
                  explicit_bool: bool = False,
                  **kwargs):
         super().__init__(args, underscores_to_dashes, explicit_bool, kwargs)
-        self.block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
 
     def process_args(self):
         self.device = torch.device("cpu" if self.not_cuda else "cuda:0")
@@ -86,3 +88,19 @@ class Config(Tap):
         self.stop_scale = self.num_scales
         self.ImgGen: Union[MarioLevelGen, ZeldaLevelGen,
                            MegamanLevelGen, MariokartLevelGen] = MarioLevelGen(self.game + "/sprites")
+
+        if not self.repr_type:
+            self.block2repr = None
+        elif self.repr_type == "block2vec":
+            self.block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+        elif self.repr_type == "autoencoder":
+            self.block2repr = {"encoder": torch.load("input/minecraft/simple_encoder.pt"),
+                               "decoder": torch.load("input/minecraft/simple_decoder.pt")}
+            self.block2repr["encoder"] = self.block2repr["encoder"].to(self.device)
+            self.block2repr["decoder"] = self.block2repr["decoder"].to(self.device)
+            self.block2repr["encoder"].requires_grad = False
+            self.block2repr["decoder"].requires_grad = False
+            self.block2repr["encoder"].eval()
+            self.block2repr["decoder"].eval()
+        else:
+            AttributeError("unexpected repr_type, use [None, block2vec, autoencoder]")

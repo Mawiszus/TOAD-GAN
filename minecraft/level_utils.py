@@ -115,20 +115,25 @@ class NanoMCSchematic:
 #     return oh_level
 
 
-def one_hot_to_blockdata_level(oh_level, tokens, block2repr):
+def one_hot_to_blockdata_level(oh_level, tokens, block2repr, repr_type):
     """ Converts a full token level tensor to blockdata. """
     # Representations
     # block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+
+    if repr_type == "autoencoder":
+        oh_level = block2repr["decoder"](oh_level).detach()
 
     bdata = np.zeros(oh_level.shape[2:], 'uint8')
     for y in range(bdata.shape[0]):
         for z in range(bdata.shape[1]):
             for x in range(bdata.shape[2]):
-                dists = np.zeros((len(block2repr),))
-                for i, rep in enumerate(block2repr):
-                    dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].detach().cpu()).detach()
-                # bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
-                bdata[y, z, x] = dists.argmin()
+                if repr_type == "block2vec":
+                    dists = np.zeros((len(block2repr),))
+                    for i, rep in enumerate(block2repr):
+                        dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].detach().cpu()).detach()
+                    bdata[y, z, x] = dists.argmin()
+                else:
+                    bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
 
     return bdata
 
@@ -155,40 +160,57 @@ def read_level(opt: Config):
     # Default: Only one input level
     # with World Files, we need the coords of our actual level
     if not opt.coords:
-        # opt.coords = ((0, 32), (32, 96), (0, 32))  # y, z, x
-        opt.coords = ((1028, 1076), (60, 80), (1088, 1127))  # y, z, x
+        # Ruins
+        # opt.coords = ((1028, 1076), (60, 80), (1088, 1127))  # y, z, x
         # opt.coords = ((1044, 1060), (64, 80), (1104, 1120))  # y, z, x
+        # Fortress
+        # opt.coords = ((-1735, -1673), (146, 182), (1861, 1902))  # y, z, x
+        opt.coords = ((-1726, -1709), (146, 182), (1891, 1904))  # y, z, x
 
-    level, uniques = read_level_from_file(opt.input_dir, opt.input_name, opt.coords, opt.block2repr)
+    level, uniques = read_level_from_file(opt.input_dir, opt.input_name, opt.coords, opt.block2repr, opt.repr_type)
     opt.token_list = uniques
     logger.info("Tokens in level {}", opt.token_list)
     opt.nc_current = level.shape[1]
     return level
 
 
-def read_level_from_file(input_dir, input_name, coords, block2repr, debug=False):
+def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, debug=False):
     """ coords is ((y0,yend), (z0,zend), (x0,xend)) """
 
-    # Representations
-    # block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
-    uniques = [u for u in block2repr.keys()]
-    dim = len(block2repr[uniques[0]])  # all are the same size
+    if repr_type == "block2vec":
+        # Representations
+        # block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+        uniques = [u for u in block2repr.keys()]
+        dim = len(block2repr[uniques[0]])  # all are the same size
+        level = torch.zeros(
+            (1, dim, coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
+    else:
+        uniques = []
+        level = torch.zeros((coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
 
-    level = torch.zeros((1, dim, coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
     with World(input_name, input_dir, debug=debug) as wrld:
         for j in range(coords[0][0], coords[0][1]):
             for k in range(coords[1][0], coords[1][1]):
                 for l in range(coords[2][0], coords[2][1]):
                     block = wrld.get_block((j, k, l))
                     b_name = block.get_state().name
-                    level[0, :, j - coords[0][0], k - coords[1][0], l - coords[2][0]] = block2repr[b_name]
-                    # if b_name not in uniques:
-                    #     uniques.append(b_name)
-                    # level[j - coords[0][0], k - coords[1][0], l - coords[2][0]] = uniques.index(b_name)
-    # oh_level = torch.zeros((1, len(uniques),) + level.shape)
-    # for i, tok in enumerate(uniques):
-    #     oh_level[0, i] = (level == i)
-    oh_level = level
+                    if repr_type == "block2vec":
+                        level[0, :, j - coords[0][0], k - coords[1][0], l - coords[2][0]] = block2repr[b_name]
+                    else:
+                        if b_name not in uniques:
+                            uniques.append(b_name)
+                        level[j - coords[0][0], k - coords[1][0], l - coords[2][0]] = uniques.index(b_name)
+
+    if repr_type == "block2vec":
+        oh_level = level
+    else:
+        oh_level = torch.zeros((1, len(uniques),) + level.shape)
+        for i, tok in enumerate(uniques):
+            oh_level[0, i] = (level == i)
+
+        if repr_type == "autoencoder":
+            device = next(block2repr["encoder"].parameters()).device
+            oh_level = block2repr["encoder"](oh_level.to(device)).detach()
 
     return oh_level, uniques
 

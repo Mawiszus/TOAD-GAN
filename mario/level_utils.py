@@ -2,6 +2,7 @@ from typing import List
 from config import Config
 import torch
 from loguru import logger
+from torch.nn.functional import mse_loss
 
 from .tokens import TOKEN_GROUPS, REPLACE_TOKENS
 
@@ -57,7 +58,7 @@ def ascii_to_one_hot_level(level, tokens) -> torch.Tensor:
     return oh_level
 
 
-def one_hot_to_ascii_level(level, tokens):
+def one_hot_to_ascii_level(level, tokens, repr=None):
     """ Converts a full token level tensor to an ascii level. """
     ascii_level = []
     for i in range(level.shape[2]):
@@ -70,61 +71,99 @@ def one_hot_to_ascii_level(level, tokens):
     return ascii_level
 
 
+def ascii_to_repr_level(level, repr) -> torch.Tensor:
+    repr_level = torch.zeros((len(list(repr.values())[0]), len(level), len(level[-1])))
+    for i in range(len(level)):
+        for j in range(len(level[-1])):
+            token = level[i][j]
+            if token in repr and token != "\n":
+                repr_level[:, i, j] = repr[token]
+    return repr_level
+
+
+def repr_to_ascii_level(level, tokens, repr):
+    ascii_level = []
+    for i in range(level.shape[2]):
+        line = ""
+        for j in range(level.shape[3]):
+            dists = torch.zeros((len(repr),))
+            for n, rep in enumerate(repr):
+                dists[n] = mse_loss(repr[rep], level[0, :, i, j].detach().cpu()).detach()
+            line += tokens[dists.argmin()]
+        if i < level.shape[2] - 1:
+            line += "\n"
+        ascii_level.append(line)
+    return ascii_level
+
+
 def read_level(opt: Config, tokens=None, replace_tokens=REPLACE_TOKENS):
     """ Wrapper function for read_level_from_file using namespace opt. Updates parameters for opt."""
     # If we have multiple levels as input, we need to sync the tokens
     if opt.use_multiple_inputs:
-        uniques = set()
-        text_levels = []
-        for name in opt.input_names:
-            txt_level = load_level_from_text(
-                "%s/%s" % (opt.input_dir, name), replace_tokens)
-            for line in txt_level:
-                for token in line:
-                    # if token != "\n" and token != "M" and token != "F":
-                    if token != "\n" and token not in replace_tokens.items():
-                        uniques.add(token)
-            text_levels.append(txt_level)
+        if not opt.repr_type:
+            uniques = set()
+            text_levels = []
+            for name in opt.input_names:
+                txt_level = load_level_from_text(
+                    "%s/%s" % (opt.input_dir, name), replace_tokens)
+                for line in txt_level:
+                    for token in line:
+                        # if token != "\n" and token != "M" and token != "F":
+                        if token != "\n" and token not in replace_tokens.items():
+                            uniques.add(token)
+                text_levels.append(txt_level)
 
-        uniques = list(uniques)
-        uniques.sort()  # necessary! otherwise we won't know the token order later
+            uniques = list(uniques)
+            uniques.sort()  # necessary! otherwise we won't know the token order later
+        else:
+            uniques = list(opt.block2repr.keys())
+            text_levels = []
+            for name in opt.input_names:
+                txt_level = load_level_from_text("%s/%s" % (opt.input_dir, name), replace_tokens)
+                text_levels.append(txt_level)
+
         opt.token_list = uniques if tokens is None else tokens
         logger.info("Tokens in levels {}", opt.token_list)
         opt.nc_current = len(uniques)
 
         levels: List[torch.Tensor] = []
         for text_level in text_levels:
-            oh_level = ascii_to_one_hot_level(
-                text_level, uniques if tokens is None else tokens)
+            if not opt.repr_type:
+                oh_level = ascii_to_one_hot_level(text_level, uniques if tokens is None else tokens)
+            else:
+                oh_level = ascii_to_repr_level(text_level, opt.block2repr)
             levels.append(oh_level.unsqueeze(dim=0))
 
         return levels
 
     else:
         # Default: Only one input level
-        level, uniques = read_level_from_file(
-            opt.input_dir, opt.input_name, tokens, replace_tokens)
+        level, uniques = read_level_from_file(opt.input_dir, opt.input_name, tokens, replace_tokens, opt.block2repr)
         opt.token_list = uniques
         logger.info("Tokens in level {}", opt.token_list)
         opt.nc_current = len(uniques)
         return level
 
 
-def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPLACE_TOKENS):
+def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPLACE_TOKENS, repr=None):
     """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.
     Token. """
-    txt_level = load_level_from_text(
-        "%s/%s" % (input_dir, input_name), replace_tokens)
-    uniques = set()
-    for line in txt_level:
-        for token in line:
-            # if token != "\n" and token != "M" and token != "F":
-            if token != "\n" and token not in replace_tokens.items():
-                uniques.add(token)
-    uniques = list(uniques)
-    uniques.sort()  # necessary! otherwise we won't know the token order later
-    oh_level = ascii_to_one_hot_level(
-        txt_level, uniques if tokens is None else tokens)
+    if not repr:
+        txt_level = load_level_from_text("%s/%s" % (input_dir, input_name), replace_tokens)
+        uniques = set()
+        for line in txt_level:
+            for token in line:
+                # if token != "\n" and token != "M" and token != "F":
+                if token != "\n" and token not in replace_tokens.items():
+                    uniques.add(token)
+        uniques = list(uniques)
+        uniques.sort()  # necessary! otherwise we won't know the token order later
+        oh_level = ascii_to_one_hot_level(txt_level, uniques if tokens is None else tokens)
+    else:
+        uniques = list(repr.keys())
+        txt_level = load_level_from_text("%s/%s" % (input_dir, input_name), replace_tokens)
+        oh_level = ascii_to_repr_level(txt_level, repr)
+
     return oh_level.unsqueeze(dim=0), uniques
 
 

@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 
 # sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), ".."))  # uncomment if opening form other dir
 
-from mario.level_utils import one_hot_to_ascii_level, group_to_token, token_to_group, read_level, read_level_from_file, place_a_mario_token
+from mario.level_utils import one_hot_to_ascii_level, group_to_token, token_to_group, read_level, read_level_from_file, place_a_mario_token, repr_to_ascii_level
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from zelda.special_zelda_downsampling import special_zelda_downsampling
 from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
@@ -259,11 +259,17 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
             if current_scale == len(reals) - 1:
 
                 # Convert to level
-                to_level = one_hot_to_ascii_level if dim == 2 else one_hot_to_blockdata_level
+                if len(opt.level_shape) == 2:
+                    if not opt.repr_type:
+                        to_level = one_hot_to_ascii_level
+                    else:
+                        to_level = repr_to_ascii_level
+                else:
+                    to_level = one_hot_to_blockdata_level
 
                 # Save level txt/schematic
                 if dim == 2:
-                    level = to_level(I_curr.detach(), token_list)
+                    level = to_level(I_curr.detach(), token_list, opt.block2repr)
                     # Render and save level image
                     if render_images:
                         img = opt.ImgGen.render(level)
@@ -541,7 +547,10 @@ if __name__ == '__main__':
 
             # Get input shape for in_s
             if len(opt.level_shape) == 2:
-                real_down = downsample(1, [[opt.scale_v, opt.scale_h]], real, opt.token_list)
+                if opt.game == 'mario':
+                    real_down = downsample(1, [[opt.scale_v, opt.scale_h]], real, opt.token_list, opt.repr_type)
+                else:
+                    real_down = downsample(1, [[opt.scale_v, opt.scale_h]], real, opt.token_list)
             else:
                 real_down = downsample(1, [[opt.scale_v, opt.scale_h, opt.scale_d]], real, opt.token_list)
             real_down = real_down[0]

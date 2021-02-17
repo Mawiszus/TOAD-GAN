@@ -92,15 +92,24 @@ class Config(Tap):
         if not self.repr_type:
             self.block2repr = None
         elif self.repr_type == "block2vec":
-            self.block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+            if self.game == 'minecraft':
+                self.block2repr = load_pkl('prim_cutout_representations',
+                                           prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+            else:  # mario
+                self.block2repr = load_pkl('mario_1-1_5D_representations',
+                                           prepath='/home/awiszus/Project/TOAD-GAN/input/mario_tmp/')
         elif self.repr_type == "autoencoder":
-            self.block2repr = {"encoder": torch.load("input/minecraft/simple_encoder.pt"),
-                               "decoder": torch.load("input/minecraft/simple_decoder.pt")}
-            self.block2repr["encoder"] = self.block2repr["encoder"].to(self.device)
-            self.block2repr["decoder"] = self.block2repr["decoder"].to(self.device)
-            self.block2repr["encoder"].requires_grad = False
-            self.block2repr["decoder"].requires_grad = False
-            self.block2repr["encoder"].eval()
-            self.block2repr["decoder"].eval()
+            # So far only Minecraft
+            if self.game == 'minecraft':
+                self.block2repr = {"encoder": torch.load("input/minecraft/simple_encoder.pt"),
+                                   "decoder": torch.load("input/minecraft/simple_decoder.pt")}
+                self.block2repr["encoder"] = self.block2repr["encoder"].to(self.device)
+                self.block2repr["decoder"] = self.block2repr["decoder"].to(self.device)
+                self.block2repr["encoder"].requires_grad = False
+                self.block2repr["decoder"].requires_grad = False
+                self.block2repr["encoder"].eval()
+                self.block2repr["decoder"].eval()
+            else:
+                AttributeError("unexpected repr_type for this --game")
         else:
             AttributeError("unexpected repr_type, use [None, block2vec, autoencoder]")

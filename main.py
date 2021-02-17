@@ -105,7 +105,7 @@ def main():
         use_reals = reals
         use_maps = noise_maps
     generate_samples(generators, use_maps, use_reals,
-                     noise_amplitudes, opt, num_samples=4, in_s=in_s)
+                     noise_amplitudes, opt, num_samples=20, in_s=in_s)
 
     # Generate samples of smaller size than level
     # logger.info("Generating arbitrary sized random samples...")

@@ -12,7 +12,7 @@ import wandb
 
 from draw_concat import draw_concat
 from generate_noise import generate_spatial_noise
-from mario.level_utils import group_to_token, one_hot_to_ascii_level, token_to_group
+from mario.level_utils import group_to_token, one_hot_to_ascii_level, token_to_group, repr_to_ascii_level
 from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
 from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
@@ -324,14 +324,20 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
             else:
                 token_list = opt.token_list
 
-            to_level = one_hot_to_ascii_level if len(opt.level_shape) == 2 else one_hot_to_blockdata_level
+            if len(opt.level_shape) == 2:
+                if not opt.repr_type:
+                    to_level = one_hot_to_ascii_level
+                else:
+                    to_level = repr_to_ascii_level
+            else:
+                to_level = one_hot_to_blockdata_level
 
             if opt.ImgGen is not None:
-                real_scaled = to_level(real.detach(), token_list)
-                img = opt.ImgGen.render(to_level(fake.detach(), token_list))
+                real_scaled = to_level(real.detach(), token_list, opt.block2repr)
+                img = opt.ImgGen.render(to_level(fake.detach(), token_list, opt.block2repr))
                 img2 = opt.ImgGen.render(to_level(
                     G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1).detach(),
-                    token_list))
+                    token_list, opt.block2repr))
                 img3 = opt.ImgGen.render(real_scaled)
                 wandb.log({f"G(z)@{current_scale}": wandb.Image(img),
                            f"G(z_opt)@{current_scale}": wandb.Image(img2),

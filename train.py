@@ -86,7 +86,10 @@ def train(real, opt: Config):
             tmp_reals = [*scaled_list, level]
             reals.append(tmp_reals)
     else:
-        scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list)
+        if opt.game == 'mario':
+            scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list, opt.repr_type)
+        else:
+            scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list)
         reals = [*scaled_list, real]
         print("Scaled Shapes:")
         for r in reals:

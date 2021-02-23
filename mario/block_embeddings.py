@@ -28,19 +28,22 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    calc_neighbours = False
+    calc_neighbours = True
     train_embed = True
     visualize = True
-    level_num = "1-1"
-    embedding_dims = 5
+    level_num = "all"
+    embedding_dims = 3
+    num_epochs = 10
 
     if calc_neighbours:
         token2idx = {}
         idx2token = {}
 
         # Since Mario is finite, we can just make a full dataset with all neighbours
-        # level_names = os.listdir("../input/mario/")
-        level_names = ['lvl_' + level_num + '.txt']  # Test: only use one level
+        if level_num == 'all':
+            level_names = os.listdir("../input/mario/")
+        else:
+            level_names = ['lvl_' + level_num + '.txt']  # Test: only use one level
         level_names.sort()
 
         # get all levels and token indices
@@ -124,7 +127,6 @@ if __name__ == '__main__':
 
         W1 = Variable(torch.randn(embedding_dims, vocabulary_size).float(), requires_grad=True)
         W2 = Variable(torch.randn(vocabulary_size, embedding_dims).float(), requires_grad=True)
-        num_epochs = 50
         learning_rate = 0.001
 
         for epo in range(num_epochs):
@@ -140,7 +142,12 @@ if __name__ == '__main__':
                 log_softmax = F.log_softmax(z2, dim=0)
 
                 loss = F.nll_loss(log_softmax.view(1, -1), y_true)
-                loss_val += loss.data.item()
+
+                # spherical_Loss = F.mse_loss(W1.sum(dim=0), torch.ones((vocabulary_size,)))
+
+                # loss += spherical_Loss
+
+                loss_val += loss.data.item()  # + spherical_Loss.data.item()
                 loss.backward()
                 W1.data -= learning_rate * W1.grad.data
                 W2.data -= learning_rate * W2.grad.data
@@ -152,7 +159,7 @@ if __name__ == '__main__':
 
         token2repr = {}
         for token in token2idx:
-            token2repr[token] = W1[:, token2idx[token]].detach()
+            token2repr[token] = W1[:, token2idx[token]].detach()  # * 0.01 * W2[token2idx[token]].detach()
 
         save_pkl(token2repr, 'mario_' + level_num + '_' + str(embedding_dims) + 'D_representations',
                  prepath='../output/')

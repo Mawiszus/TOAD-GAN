@@ -198,7 +198,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                             prev = group_to_token(prev, opt.token_list, token_group)
 
                         if len(opt.level_shape) == 2:
-                            prev = interpolate(prev, real.shape[-2:], mode="bilinear", align_corners=True)
+                            prev = interpolate(prev, real.shape[-2:], mode="nearest")
                         else: # I'm assuming 2D/3D would have thrown exception by now
                             prev = interpolate3D(prev, real.shape[-3:], mode="bilinear", align_corners=True)
                         prev = pad_image(prev)
@@ -210,7 +210,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                             z_prev = group_to_token(z_prev, opt.token_list, token_group)
 
                         if len(opt.level_shape) == 2:
-                            z_prev = interpolate(z_prev, real.shape[-2:], mode="bilinear", align_corners=True)
+                            z_prev = interpolate(z_prev, real.shape[-2:], mode="nearest")
                         else:  # I'm assuming 2D/3D would have thrown exception by now
                             z_prev = interpolate3D(z_prev, real.shape[-3:], mode="bilinear", align_corners=True)
                         opt.noise_amp = update_noise_amplitude(z_prev, real, opt)

@@ -82,17 +82,21 @@ def ascii_to_repr_level(level, repr) -> torch.Tensor:
 
 
 def repr_to_ascii_level(level, tokens, repr):
-    ascii_level = []
-    for i in range(level.shape[2]):
-        line = ""
-        for j in range(level.shape[3]):
-            dists = torch.zeros((len(repr),))
-            for n, rep in enumerate(repr):
-                dists[n] = mse_loss(repr[rep], level[0, :, i, j].detach().cpu()).detach()
-            line += tokens[dists.argmin()]
-        if i < level.shape[2] - 1:
-            line += "\n"
-        ascii_level.append(line)
+    if "encoder" in repr:
+        oh_level = repr["decoder"](level).detach()
+        ascii_level = one_hot_to_ascii_level(oh_level, tokens)
+    else:
+        ascii_level = []
+        for i in range(level.shape[2]):
+            line = ""
+            for j in range(level.shape[3]):
+                dists = torch.zeros((len(repr),))
+                for n, rep in enumerate(repr):
+                    dists[n] = mse_loss(repr[rep], level[0, :, i, j].detach().cpu()).detach()
+                line += tokens[dists.argmin()]
+            if i < level.shape[2] - 1:
+                line += "\n"
+            ascii_level.append(line)
     return ascii_level
 
 
@@ -148,7 +152,7 @@ def read_level(opt: Config, tokens=None, replace_tokens=REPLACE_TOKENS):
 def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPLACE_TOKENS, repr=None):
     """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.
     Token. """
-    if not repr:
+    if not repr or "encoder" in repr:
         txt_level = load_level_from_text("%s/%s" % (input_dir, input_name), replace_tokens)
         uniques = set()
         for line in txt_level:
@@ -158,13 +162,16 @@ def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPL
                     uniques.add(token)
         uniques = list(uniques)
         uniques.sort()  # necessary! otherwise we won't know the token order later
-        oh_level = ascii_to_one_hot_level(txt_level, uniques if tokens is None else tokens)
+        oh_level = ascii_to_one_hot_level(txt_level, uniques if tokens is None else tokens).unsqueeze(dim=0)
+        if repr and "encoder" in repr:
+            device = next(repr["encoder"].parameters()).device
+            oh_level = repr["encoder"](oh_level.to(device)).detach()
     else:
         uniques = list(repr.keys())
         txt_level = load_level_from_text("%s/%s" % (input_dir, input_name), replace_tokens)
-        oh_level = ascii_to_repr_level(txt_level, repr)
+        oh_level = ascii_to_repr_level(txt_level, repr).unsqueeze(dim=0)
 
-    return oh_level.unsqueeze(dim=0), uniques
+    return oh_level, uniques
 
 
 def place_a_mario_token(level):

@@ -96,13 +96,16 @@ class Config(Tap):
                 self.block2repr = load_pkl('prim_cutout_representations',
                                            prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
             else:  # mario
-                self.block2repr = load_pkl('mario_1-1_5D_representations',
+                self.block2repr = load_pkl('mario_all_2D_representations',
                                            prepath='/home/awiszus/Project/TOAD-GAN/input/mario_tmp/')
         elif self.repr_type == "autoencoder":
             # So far only Minecraft
-            if self.game == 'minecraft':
-                self.block2repr = {"encoder": torch.load("input/minecraft/simple_encoder.pt"),
-                                   "decoder": torch.load("input/minecraft/simple_decoder.pt")}
+            if self.game == 'minecraft' or self.game == "mario":
+                name = self.game
+                if name == "mario":
+                    name += "_tmp"
+                self.block2repr = {"encoder": torch.load("input/" + name + "/simple_encoder.pt"),
+                                   "decoder": torch.load("input/" + name + "/simple_decoder.pt")}
                 self.block2repr["encoder"] = self.block2repr["encoder"].to(self.device)
                 self.block2repr["decoder"] = self.block2repr["decoder"].to(self.device)
                 self.block2repr["encoder"].requires_grad = False

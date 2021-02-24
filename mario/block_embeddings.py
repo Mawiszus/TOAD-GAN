@@ -16,6 +16,7 @@ sys.path.append("..")  # Adds higher directory to python modules path.
 
 from utils import load_pkl, save_pkl
 from mario.level_utils import load_level_from_text, REPLACE_TOKENS
+from mario.tokens import TOKEN_GROUPS_REDUX
 
 
 def get_input_layer(word_idx, vocabulary_size):
@@ -28,11 +29,11 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    calc_neighbours = True
+    calc_neighbours = False
     train_embed = True
     visualize = True
     level_num = "all"
-    embedding_dims = 3
+    embedding_dims = 2
     num_epochs = 10
 
     if calc_neighbours:
@@ -159,7 +160,14 @@ if __name__ == '__main__':
 
         token2repr = {}
         for token in token2idx:
-            token2repr[token] = W1[:, token2idx[token]].detach()  # * 0.01 * W2[token2idx[token]].detach()
+            val = 0
+            for i, group in enumerate(TOKEN_GROUPS_REDUX):
+                if token in group:
+                    val = i
+
+            token2repr[token] = torch.zeros((embedding_dims + 1,))
+            token2repr[token][0:embedding_dims] = W1[:, token2idx[token]].detach()  # * 0.01 * W2[token2idx[token]].detach()
+            token2repr[token][-1] = val
 
         save_pkl(token2repr, 'mario_' + level_num + '_' + str(embedding_dims) + 'D_representations',
                  prepath='../output/')

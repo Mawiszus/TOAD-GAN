@@ -29,12 +29,13 @@ if __name__ == '__main__':
 
     start_time = time.time()
 
-    calc_neighbours = False
+    calc_neighbours = True
     train_embed = True
     visualize = True
     level_num = "all"
-    embedding_dims = 2
-    num_epochs = 10
+    game = "mariokart"
+    embedding_dims = 3
+    num_epochs = 5
 
     if calc_neighbours:
         token2idx = {}
@@ -42,7 +43,7 @@ if __name__ == '__main__':
 
         # Since Mario is finite, we can just make a full dataset with all neighbours
         if level_num == 'all':
-            level_names = os.listdir("../input/mario/")
+            level_names = os.listdir("../input/" + game + "/")
         else:
             level_names = ['lvl_' + level_num + '.txt']  # Test: only use one level
         level_names.sort()
@@ -51,7 +52,7 @@ if __name__ == '__main__':
         ascii_levels = []
         idx = 0
         for name in level_names:
-            txt_level = load_level_from_text("../input/mario/" + name)
+            txt_level = load_level_from_text("../input/" + game + "/" + name)
             for line in txt_level:
                 for token in line:
                     if token != "\n" and token not in token2idx.keys():
@@ -113,13 +114,13 @@ if __name__ == '__main__':
 
         shuffle(idx_pairs)
 
-        save_pkl(idx_pairs, "mario_" + level_num + "_neighbour_list_shuffled", "../input/mario_tmp/")
-        save_pkl(token2idx, "mario_" + level_num + "_token2idx", "../input/mario_tmp/")
-        save_pkl(idx2token, "mario_" + level_num + "_idx2token", "../input/mario_tmp/")
+        save_pkl(idx_pairs, game + "_" + level_num + "_neighbour_list_shuffled", "../output/tmp_vec_calc/")
+        save_pkl(token2idx, game + "_" + level_num + "_token2idx", "../output/tmp_vec_calc/")
+        save_pkl(idx2token, game + "_" + level_num + "_idx2token", "../output/tmp_vec_calc/")
     else:
-        idx_pairs = load_pkl("mario_" + level_num + "_neighbour_list_shuffled", "../input/mario_tmp/")
-        token2idx = load_pkl("mario_" + level_num + "_token2idx", "../input/mario_tmp/")
-        idx2token = load_pkl("mario_" + level_num + "_idx2token", "../input/mario_tmp/")
+        idx_pairs = load_pkl(game + "_" + level_num + "_neighbour_list_shuffled", "../output/tmp_vec_calc/")
+        token2idx = load_pkl(game + "_" + level_num + "_token2idx", "../output/tmp_vec_calc/")
+        idx2token = load_pkl(game + "_" + level_num + "_idx2token", "../output/tmp_vec_calc/")
 
     # TRAINING
     if train_embed:
@@ -169,11 +170,11 @@ if __name__ == '__main__':
             token2repr[token][0:embedding_dims] = W1[:, token2idx[token]].detach()  # * 0.01 * W2[token2idx[token]].detach()
             token2repr[token][-1] = val
 
-        save_pkl(token2repr, 'mario_' + level_num + '_' + str(embedding_dims) + 'D_representations',
-                 prepath='../output/')
+        save_pkl(token2repr, game + '_' + level_num + '_' + str(embedding_dims) + 'D_representations',
+                 prepath='../output/vec_calc/')
     else:
-        token2repr = load_pkl('mario_' + level_num + '_' + str(embedding_dims) + 'D_representations',
-                              prepath='../output/')
+        token2repr = load_pkl(game + '_' + level_num + '_' + str(embedding_dims) + 'D_representations',
+                              prepath='../output/vec_calc/')
 
     if visualize:
         dists = np.zeros((len(token2repr), len(token2repr)))
@@ -187,7 +188,7 @@ if __name__ == '__main__':
         confusion_display = ConfusionMatrixDisplay(dists, names)
         confusion_display.plot(include_values=False)
         plt.tight_layout()
-        figure_path = "../output/dist_matrix_mario_" + level_num + ".pdf"
+        figure_path = "../output/tmp_vec_calc/dist_matrix_" + game + "_" + level_num + ".pdf"
         plt.savefig(figure_path, dpi=300)
 
     end_time = time.time() - start_time

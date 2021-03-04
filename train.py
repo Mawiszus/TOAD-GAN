@@ -17,6 +17,7 @@ from zelda.special_zelda_downsampling import special_zelda_downsampling
 from megaman.special_megaman_downsampling import special_megaman_downsampling
 from mariokart.special_mariokart_downsampling import special_mariokart_downsampling
 from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
+from minecraft.level_renderer import make_render_script, make_obj
 from models import init_models, reset_grads, restore_weights
 from models.generator import Level_GeneratorConcatSkip2CleanAdd
 from train_single_scale import train_single_scale
@@ -126,6 +127,13 @@ def train(real, opt: Config):
         if opt.ImgGen is not None:
             img = opt.ImgGen.render(one_hot_to_ascii_level(real, opt.token_list))
             wandb.log({"real": wandb.Image(img)}, commit=False)
+        else: # Minecraft
+            os.makedirs("%s/objects" % opt.out_, exist_ok=True)
+            objectpath = os.path.join(opt.out_, "objects/")
+            make_render_script("minecraft/mineways/", "real", objectpath, "real", opt.input_name, opt.coords)
+            make_obj("minecraft/mineways/", ["real", "close"])
+            obj_path = objectpath + "real.obj"
+            wandb.log({"real": wandb.Object3D(open(obj_path))}, commit=False)
         os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
 
     # Training Loop

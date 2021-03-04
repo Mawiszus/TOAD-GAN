@@ -7,3 +7,12 @@ XYZ: 1028 64 1088
 - Old Guard Fortress:
 XYZ: -1735 146 1861
      -1673 182 1902
+
+- Large Beach
+XYZ: 710 84 2324
+
+- Big white temple
+XYZ: 3307 122 3376
+
+Or just cut out of the map yourself, because looking it up in Minecraft is a little stupid
+Link to detailed map: https://i.redd.it/kv7ylaz92ka51.jpg

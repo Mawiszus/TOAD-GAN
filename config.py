@@ -86,8 +86,15 @@ class Config(Tap):
         self.seed_road = None  # for mario kart seed roads after training
         # which scale to stop on - usually always last scale defined
         self.stop_scale = self.num_scales
-        self.ImgGen: Union[MarioLevelGen, ZeldaLevelGen,
-                           MegamanLevelGen, MariokartLevelGen] = MarioLevelGen(self.game + "/sprites")
+
+        if self.game == 'mario':
+            self.ImgGen = MarioLevelGen(self.game + "/sprites")
+        elif self.game == 'mariokart':
+            self.ImgGen = MariokartLevelGen(self.game + "/sprites")
+        elif self.game == 'megaman':
+            self.ImgGen = MegamanLevelGen(self.game + "/sprites")
+        else:  # zelda
+            self.ImgGen = ZeldaLevelGen(self.game + "/sprites")
 
         if not self.repr_type:
             self.block2repr = None
@@ -96,8 +103,8 @@ class Config(Tap):
                 self.block2repr = load_pkl('prim_cutout_representations',
                                            prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
             else:  # mario
-                self.block2repr = load_pkl('mario_all_2D_representations',
-                                           prepath='/home/awiszus/Project/TOAD-GAN/input/mario_tmp/')
+                self.block2repr = load_pkl(self.game + '_all_3D_representations',
+                                           prepath='/home/awiszus/Project/TOAD-GAN/output/vec_calc/')
         elif self.repr_type == "autoencoder":
             # So far only Minecraft
             if self.game == 'minecraft' or self.game == "mario":

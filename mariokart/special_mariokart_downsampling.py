@@ -24,6 +24,8 @@ def special_mariokart_downsampling(num_scales, scales, image, token_list):
         bil_scaled = interpolate(image, (int(image.shape[-2] * scale_v), int(image.shape[-1] * scale_h)),
                                  mode='bilinear', align_corners=False)
 
+        img_scaled = bil_scaled
+        '''
         # Init output level
         img_scaled = torch.zeros_like(bil_scaled)
 
@@ -46,6 +48,7 @@ def special_mariokart_downsampling(num_scales, scales, image, token_list):
 
                 # Adjust level to look more like the generator output through a Softmax function.
                 img_scaled[:, :, x, y] = Softmax(dim=1)(30*img_scaled[:, :, x, y])
+        '''
 
         scaled_list.append(img_scaled)
 

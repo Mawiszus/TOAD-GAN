@@ -1,7 +1,6 @@
 import os
 import subprocess
-
-# (use object?)
+import wandb
 
 
 def make_render_script(scriptpath, scriptname, obj_path, obj_name, worldname, coords):
@@ -30,3 +29,12 @@ def make_obj(scriptpath, scriptnames, worldpath="../minecraft_worlds/"):
     stdout, stderr = process.communicate()
     print(stdout)
     print(stderr)
+
+
+def render_minecraft(opt, folder, name, worldname, coords):
+    os.makedirs("%s/objects/%s" % (opt.out_, folder), exist_ok=True)
+    objectpath = os.path.join(opt.out_, "objects/" + folder + "/")
+    make_render_script("minecraft/mineways/", name, objectpath, name, worldname, coords)
+    make_obj("minecraft/mineways/", [name, "close"])
+    obj_path = objectpath + name + ".obj"
+    wandb.log({name: wandb.Object3D(open(obj_path))}, commit=False)

@@ -14,6 +14,7 @@ from draw_concat import draw_concat
 from generate_noise import generate_spatial_noise
 from mario.level_utils import group_to_token, one_hot_to_ascii_level, token_to_group, repr_to_ascii_level
 from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world
+from minecraft.level_renderer import render_minecraft
 from mario.tokens import TOKEN_GROUPS as MARIO_TOKEN_GROUPS
 from zelda.tokens import TOKEN_GROUPS as ZELDA_TOKEN_GROUPS
 from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
@@ -340,7 +341,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                     token_list, opt.block2repr))
                 img3 = opt.ImgGen.render(real_scaled)
                 wandb.log({f"G(z)@{current_scale}": wandb.Image(img),
-                           f"G(z_opt)@{current_scale}": wandb.Image(img2),
+                           f"G(z_opt)@{current_scale}"f"G(z_opt)@{current_scale}": wandb.Image(img2),
                            f"real@{current_scale}": wandb.Image(img3)},
                           sync=False, commit=False)
 
@@ -348,7 +349,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 with open(real_scaled_path, "w") as f:
                     f.writelines(real_scaled)
                 wandb.save(real_scaled_path)
-            else:
+            else:  # Minecraft
                 real_scaled = to_level(real.detach(), token_list, opt.block2repr, opt.repr_type)
                 # Minecraft Schematic
                 # real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.schematic")
@@ -357,12 +358,18 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 # new_schem.saveToFile()
                 # wandb.save(real_scaled_path)
                 # Minecraft World
-                clear_empty_world(opt.output_dir, 'Curr_Empty_World')  # reset tmp world
+                worldname = 'Curr_Empty_World'
+                clear_empty_world(opt.output_dir, worldname)  # reset tmp world
                 to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr, opt.repr_type),
                              to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr, opt.repr_type)]
+                render_names = [f"real@{current_scale}", f"G(z)@{current_scale}", f"G(z_opt)@{current_scale}"]
                 for n, level in enumerate(to_render):
                     pos = n * (level.shape[0] + 5)
-                    save_level_to_world(opt.output_dir, 'Curr_Empty_World', (pos, 0, 0), level, token_list)
+                    save_level_to_world(opt.output_dir, worldname, (pos, 0, 0), level, token_list)
+                    curr_coords = [[pos, pos + real_scaled.shape[0]],
+                                   [0, real_scaled.shape[1]],
+                                   [0, real_scaled.shape[2]]]
+                    render_minecraft(opt, str(current_scale), render_names[n], worldname, curr_coords)
 
             # Learning Rate scheduler step
             schedulerD.step()

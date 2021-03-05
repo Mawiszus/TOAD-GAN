@@ -162,10 +162,10 @@ def read_level(opt: Config):
     if not opt.coords:
         # Ruins
         # opt.coords = ((1028, 1076), (60, 80), (1088, 1127))  # y, z, x
-        # opt.coords = ((1044, 1060), (64, 80), (1104, 1120))  # y, z, x
+        opt.coords = ((1044, 1060), (64, 80), (1104, 1120))  # y, z, x
         # Fortress
         # opt.coords = ((-1735, -1673), (146, 182), (1861, 1902))  # y, z, x
-        opt.coords = ((-1726, -1709), (146, 182), (1891, 1904))  # y, z, x
+        # opt.coords = ((-1726, -1709), (146, 182), (1891, 1904))  # y, z, x
 
     level, uniques = read_level_from_file(opt.input_dir, opt.input_name, opt.coords, opt.block2repr, opt.repr_type)
     opt.token_list = uniques

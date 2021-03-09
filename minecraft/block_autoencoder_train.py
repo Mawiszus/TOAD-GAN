@@ -35,7 +35,7 @@ if __name__ == '__main__':
     optimizerE = optim.Adam(enc.parameters(), lr=opt.lr_d, betas=(opt.beta1, 0.999))
     optimizerD = optim.Adam(dec.parameters(), lr=opt.lr_d, betas=(opt.beta1, 0.999))
 
-    for epoch in tqdm(range(500)):
+    for epoch in tqdm(range(100)):
         enc.zero_grad()
         dec.zero_grad()
         for lev in levels:

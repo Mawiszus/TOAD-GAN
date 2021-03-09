@@ -10,11 +10,11 @@ if __name__ == '__main__':
     for i, obj_name in enumerate(obj_list):
         with open(obj_name, 'r') as f:
             for line in f.readlines():
-                if line[:32] == "# Selection location min to max:":
+                if line[:44] == "#   Non-empty selection location min to max:":
                     words = line.split(" ")
                     # need to remove last character because of "," (8 does not have a ",")
-                    numbers = [int(words[6][:-1]), int(words[7][:-1]), int(words[8]),
-                               int(words[10][:-1]), int(words[11][:-1]), int(words[12][:-1])]
+                    numbers = [int(words[9][:-1]), int(words[10][:-1]), int(words[11]),
+                               int(words[13][:-1]), int(words[14][:-1]), int(words[15][:-1])]
                     # coords formatting
                     coords = ((numbers[0], numbers[3]), (numbers[1], numbers[4]), (numbers[2], numbers[5]))
 

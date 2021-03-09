@@ -30,10 +30,12 @@ class Config(Tap):
     input_names: List[str] = ["lvl_1-1.txt", "lvl_1-2.txt"]
     # use mulitple inputs for training (use --input-names instead of --input-name)
     use_multiple_inputs: bool = False
+
     # if minecraft is used, which coords are used from the world? Which world do we save to?
-    coords: int = None  # will be a tuple later (How do I secify a tuple here?)
+    input_area_name: str = "ruins"  # needs to be a string from the coord dictionary in input folder
     output_dir: str = "../minecraft_worlds/"  # folder with worlds
     output_name: str = "Gen_Empty_World"  # name of the world to generate in
+
     nfc: int = 64  # number of filters for conv layers
     ker_size: int = 3  # kernel size for conv layers
     num_layer: int = 3  # number of layers
@@ -93,8 +95,11 @@ class Config(Tap):
             self.ImgGen = MariokartLevelGen(self.game + "/sprites")
         elif self.game == 'megaman':
             self.ImgGen = MegamanLevelGen(self.game + "/sprites")
-        else:  # zelda
+        elif self.game == 'zelda':
             self.ImgGen = ZeldaLevelGen(self.game + "/sprites")
+        else:  # minecraft
+            coord_dict = load_pkl('primordial_coords_dict', 'input/minecraft/')
+            self.coords = coord_dict[self.input_area_name]
 
         if not self.repr_type:
             self.block2repr = None

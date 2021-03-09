@@ -16,3 +16,4 @@ main.sh
 nobackup
 main_cpu.sh
 /minecraft/block_embedding_dataset.sh
+lightning_logs

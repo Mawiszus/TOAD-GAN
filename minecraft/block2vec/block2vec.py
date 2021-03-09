@@ -92,7 +92,7 @@ class Block2Vec(pl.LightningModule):
             f.write('%d %d\n' % (len(id2block), self.args.emb_dimension))
             for wid, w in id2block.items():
                 e = ' '.join(map(lambda x: str(x), embeddings[wid]))
-                embedding_dict[w.replace("minecraft:", "")] = embeddings[wid]
+                embedding_dict[w] = torch.from_numpy(embeddings[wid])
                 f.write('%s %s\n' % (w, e))
         np.save(os.path.join(output_path, "embeddings.npy"), embeddings)
         with open(os.path.join(output_path, "representations.pkl"), "wb") as f:
@@ -102,7 +102,7 @@ class Block2Vec(pl.LightningModule):
     def plot_embeddings(self, embedding_dict: Dict[str, np.ndarray], output_path: str):
         fig = plt.figure(figsize=(15, 15))
         ax = fig.add_subplot(111, projection='3d')
-        legend = list(embedding_dict.keys())
+        legend = [label.replace("minecraft:", "") for label in embedding_dict.keys()]
         texture_imgs = [self.read_texture(block) for block in legend]
         for block, embedding in embedding_dict.items():
             ax.scatter(embedding[0], embedding[1], embedding[2], alpha=0)

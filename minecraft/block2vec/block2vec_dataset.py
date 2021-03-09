@@ -5,6 +5,7 @@ from typing import Tuple
 
 from loguru import logger
 import numpy as np
+from tqdm import tqdm
 
 from PyAnvilEditor.pyanvil import World
 from torch.utils.data.dataset import Dataset
@@ -12,7 +13,7 @@ from torch.utils.data.dataset import Dataset
 
 class Block2VecDataset(Dataset):
 
-    def __init__(self, input_world_path: str, coords: Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]], neighbor_radius: int = 1):
+    def __init__(self, input_world_path: str, coords: Tuple[Tuple[int, int], Tuple[int, int], Tuple[int, int]], cutout_coords: bool,  neighbor_radius: int = 1):
         """Block dataset with configurable neighborhood radius.
 
         Args:
@@ -22,7 +23,9 @@ class Block2VecDataset(Dataset):
         """
         super().__init__()
         self.input_world_path = input_world_path
-        self.x_lims, self.y_lims, self.z_lims = coords
+        self.world = World(os.path.basename(input_world_path),
+                           save_location=os.path.abspath(os.path.dirname(input_world_path)), write=False, debug=False)
+        self.x_lims, self.y_lims, self.z_lims = coords if cutout_coords else self._read_size()
         padding = 2 * neighbor_radius  # one token on each side
         self.x_dim = self.x_lims[1] - self.x_lims[0] - padding
         self.y_dim = self.y_lims[1] - self.y_lims[0] - padding
@@ -30,16 +33,30 @@ class Block2VecDataset(Dataset):
         logger.info("Cutting {} x {} x {} volume from {}", self.x_dim,
                     self.y_dim, self.z_dim, self.input_world_path)
         self.neighbor_radius = neighbor_radius
-        self.world = World(os.path.basename(input_world_path),
-                           save_location=os.path.abspath(os.path.dirname(input_world_path)), write=False, debug=False)
         self._read_blocks()
+
+    def _read_size(self):
+        regions = os.listdir(self.world.world_folder / 'region')
+        arr_regions = np.zeros((len(regions), 2))
+        for i, r in enumerate(regions):
+            name = r.split(".")
+            rx = int(name[1])
+            rz = int(name[2])
+            arr_regions[i] = rx, rz
+        igno_border = 0
+        x_lims = [int((min(arr_regions[:, 0]) * 32 * 16) + igno_border),
+                  int((max(arr_regions[:, 0]) * 32 * 16) - igno_border)]
+        z_lims = [int((min(arr_regions[:, 1]) * 32 * 16) + igno_border),
+                  int((max(arr_regions[:, 1]) * 32 * 16) - igno_border)]
+        y_lims = [0, 256]
+        return x_lims, y_lims, z_lims
 
     def _read_blocks(self):
         self.block_frequency = defaultdict(int)
         coordinates = [(x, y, z) for x, y, z in product(range(self.x_lims[0], self.x_lims[1] + 1),
                                                         range(self.y_lims[0], self.y_lims[1] + 1), range(self.z_lims[0], self.z_lims[1] + 1))]
         logger.info("Collecting {} blocks", len(self))
-        for name in [self._get_block(*coord) for coord in coordinates]:
+        for name in tqdm([self._get_block(*coord) for coord in coordinates]):
             self.block_frequency[name] += 1
         logger.info(
             "Found the following blocks {blocks}", blocks=dict(self.block_frequency))

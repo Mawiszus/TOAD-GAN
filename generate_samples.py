@@ -1,6 +1,8 @@
 from typing import Optional
 
 import yaml
+import math
+import numpy as np
 from config import Config
 import os
 from shutil import copyfile
@@ -33,6 +35,7 @@ from mario.special_mario_downsampling import special_mario_downsampling
 from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
 from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world
 from minecraft.level_utils import read_level as mc_read_level
+from minecraft.level_renderer import render_minecraft
 from generate_noise import generate_spatial_noise
 from models import load_trained_pyramid
 from utils import interpolate3D
@@ -89,7 +92,6 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
     elif opt.game == 'mariokart':
         token_groups = MARIOKART_TOKEN_GROUPS
     elif opt.game == 'minecraft':
-        render_images = False  # can only save schematics so far
         token_groups = []
     else:
         raise NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart, minecraft")
@@ -107,10 +109,14 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
         try:
             os.makedirs(dir2save, exist_ok=True)
             if render_images:
-                os.makedirs("%s/img" % dir2save, exist_ok=True)
+                if opt.game != 'minecraft':
+                    os.makedirs("%s/img" % dir2save, exist_ok=True)
             if save_tensors:
                 os.makedirs("%s/torch" % dir2save, exist_ok=True)
-            os.makedirs("%s/txt" % dir2save, exist_ok=True)
+                if opt.game == 'minecraft':
+                    os.makedirs("%s/torch_blockdata" % dir2save, exist_ok=True)
+            if dim == 2:
+                os.makedirs("%s/txt" % dir2save, exist_ok=True)
         except OSError:
             pass
 
@@ -123,7 +129,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                 level = one_hot_to_ascii_level(in_s[0].detach().unsqueeze(0), token_list)
 
                 # Render and save level image
-                if render_images:
+                if render_images and opt.game != 'minecraft':
                     img = opt.ImgGen.render(level)
                     img.save("%s/img/%d_sc%d.png" %
                              (dir2save, opt.token_insert, current_scale))
@@ -212,7 +218,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         I_prev, opt.token_list, token_groups)
 
             if dim == 2:
-                I_prev = interpolate(I_prev, nz, mode='bilinear', align_corners=True)
+                I_prev = interpolate(I_prev, nz, mode='nearest')
             else:
                 I_prev = interpolate3D(I_prev, nz, mode='bilinear', align_corners=True)
             I_prev = m(I_prev)
@@ -267,7 +273,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                 else:
                     to_level = one_hot_to_blockdata_level
 
-                # Save level txt/schematic
+                # Save level txt
                 if dim == 2:
                     level = to_level(I_curr.detach(), token_list, opt.block2repr)
                     # Render and save level image
@@ -279,15 +285,25 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     with open("%s/txt/%d_sc%d.txt" % (dir2save, n, current_scale), "w") as f:
                         f.writelines(level)
                 else:
-                    # Minecraft Schematic
+                    # Minecraft
                     level = to_level(I_curr.detach(), token_list, opt.block2repr, opt.repr_type)
+                    torch.save(level, "%s/torch_blockdata/%d_sc%d.pt" % (dir2save, n, current_scale))
                     # save_path = "%s/txt/%d_sc%d.schem" % (dir2save, n, current_scale)
                     # new_schem = NanoMCSchematic(save_path, level.shape[:3])
                     # new_schem.set_blockdata(level)
                     # new_schem.saveToFile()
-                    # Minecraft World
-                    pos = n * (level.shape[0] + 5)
-                    save_level_to_world(opt.output_dir, opt.output_name, (pos, 0, 0), level, token_list)
+                    if render_images:
+                        # Minecraft World
+                        len_n = math.ceil(math.sqrt(num_samples))  # we arrange our samples in a square in the world
+                        x, z = np.unravel_index(n, [len_n, len_n])  # get x, z pos according to index n
+                        posx = x * (level.shape[0] + 5)
+                        posz = z * (level.shape[0] + 5)
+                        save_level_to_world(opt.output_dir, opt.output_name, (posx, 0, posz), level, token_list)
+                        curr_coords = [[posx, posx + level.shape[0]],
+                                       [0, level.shape[1]],
+                                       [posz, posz + level.shape[2]]]
+                        render_minecraft(opt, "%d" % current_scale, "%d" % n,
+                                         opt.output_name, curr_coords, basepath=dir2save)
 
                 # Save torch tensor
                 if save_tensors:

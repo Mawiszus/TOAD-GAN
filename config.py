@@ -87,7 +87,7 @@ class Config(Tap):
         self.noise_amp = 1.0  # noise amp for lowest scale always starts at 1
         self.seed_road = None  # for mario kart seed roads after training
         # which scale to stop on - usually always last scale defined
-        self.stop_scale = self.num_scales
+        self.stop_scale = self.num_scales + 1
 
         if self.game == 'mario':
             self.ImgGen = MarioLevelGen(self.game + "/sprites")

@@ -113,8 +113,6 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     os.makedirs("%s/img" % dir2save, exist_ok=True)
             if save_tensors:
                 os.makedirs("%s/torch" % dir2save, exist_ok=True)
-                if opt.game == 'minecraft':
-                    os.makedirs("%s/torch_blockdata" % dir2save, exist_ok=True)
             if dim == 2:
                 os.makedirs("%s/txt" % dir2save, exist_ok=True)
         except OSError:
@@ -286,6 +284,11 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         f.writelines(level)
                 else:
                     # Minecraft
+                    if n == 0:  # in first step make folder and save real blockdata
+                        os.makedirs("%s/torch_blockdata" % dir2save, exist_ok=True)
+                        real_level = to_level(reals[current_scale], token_list, opt.block2repr, opt.repr_type)
+                        torch.save(real_level, "%s/real_bdata_sc%d.pt" % (dir2save, current_scale))
+
                     level = to_level(I_curr.detach(), token_list, opt.block2repr, opt.repr_type)
                     torch.save(level, "%s/torch_blockdata/%d_sc%d.pt" % (dir2save, n, current_scale))
                     # save_path = "%s/txt/%d_sc%d.schem" % (dir2save, n, current_scale)

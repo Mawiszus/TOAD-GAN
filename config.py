@@ -35,6 +35,8 @@ class Config(Tap):
     input_area_name: str = "ruins"  # needs to be a string from the coord dictionary in input folder
     output_dir: str = "../minecraft_worlds/"  # folder with worlds
     output_name: str = "Gen_Empty_World"  # name of the world to generate in
+    sub_coords: List[float] = [0.0, 1.0, 0.0, 1.0, 0.0, 1.0]  # defines which coords of the full coord are are
+    # taken (if float -> percentage, if int -> absolute)
 
     nfc: int = 64  # number of filters for conv layers
     ker_size: int = 3  # kernel size for conv layers
@@ -99,14 +101,34 @@ class Config(Tap):
             self.ImgGen = ZeldaLevelGen(self.game + "/sprites")
         else:  # minecraft
             coord_dict = load_pkl('primordial_coords_dict', 'input/minecraft/')
-            self.coords = coord_dict[self.input_area_name]
+            tmp_coords = coord_dict[self.input_area_name]
+            sub_coords = [(self.sub_coords[0], self.sub_coords[1]),
+                          (self.sub_coords[2], self.sub_coords[3]),
+                          (self.sub_coords[4], self.sub_coords[5])]
+            self.coords = []
+            for i, (start, end) in enumerate(sub_coords):
+                curr_len = tmp_coords[i][1] - tmp_coords[i][0]
+                if isinstance(start, float):
+                    tmp_start = curr_len * start + tmp_coords[i][0]
+                    tmp_end = curr_len * end + tmp_coords[i][0]
+                elif isinstance(start, int):
+                    tmp_start = tmp_coords[i][0] + start
+                    tmp_end = tmp_coords[i][0] + end
+                else:
+                    AttributeError("Unexpected type for sub_coords")
+                    tmp_start = tmp_coords[i][0]
+                    tmp_end = tmp_coords[i][1]
+
+                self.coords.append((int(tmp_start), int(tmp_end)))
 
         if not self.repr_type:
             self.block2repr = None
         elif self.repr_type == "block2vec":
             if self.game == 'minecraft':
-                self.block2repr = load_pkl('representations',
-                                           prepath='/home/awiszus/Project/TOAD-GAN/output/block2vec/')
+                self.block2repr = load_pkl('prim_cutout_representations_ruins',
+                                           prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+                # self.block2repr = load_pkl('representations',
+                #                            prepath='/home/awiszus/Project/TOAD-GAN/output/block2vec/')
             else:  # mario
                 self.block2repr = load_pkl(self.game + '_all_3D_representations',
                                            prepath='/home/awiszus/Project/TOAD-GAN/output/vec_calc/')

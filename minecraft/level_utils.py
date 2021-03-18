@@ -128,9 +128,15 @@ def one_hot_to_blockdata_level(oh_level, tokens, block2repr, repr_type):
         for z in range(bdata.shape[1]):
             for x in range(bdata.shape[2]):
                 if repr_type == "block2vec":
-                    dists = np.zeros((len(block2repr),))
-                    for i, rep in enumerate(block2repr):
-                        dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].detach().cpu()).detach()
+                    dists = np.zeros((len(tokens),))
+                    for i, rep in enumerate(tokens):
+                        if isinstance(block2repr[rep], list):
+                            dists2 = np.zeros((len(block2repr[rep]),))
+                            for j, rep2 in enumerate(block2repr[rep]):
+                                dists2[j] = F.mse_loss(rep2, oh_level[0, :, y, z, x].detach().cpu()).detach()
+                            dists[i] = dists2.min()
+                        else:
+                            dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].detach().cpu()).detach()
                     bdata[y, z, x] = dists.argmin()
                 else:
                     bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
@@ -227,6 +233,35 @@ def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_
                     block = wrld.get_block((j, k, l))
                     actual_pos = (j-start_coords[0], k-start_coords[1], l-start_coords[2])
                     block.set_state(BlockState(token_list[bdata_level[actual_pos]], {}))
+
+
+def save_oh_to_wrld_directly(input_dir, input_name, start_coords, oh_level, block2repr, repr_type, debug=False):
+    if repr_type == "autoencoder":
+        oh_level = block2repr["decoder"](oh_level).detach()
+    elif repr_type == "block2vec":
+        token_list = list(block2repr.keys())
+
+    bdata = np.zeros(oh_level.shape[2:], 'uint8')
+    with World(input_name, input_dir, debug=debug) as wrld:
+        # fill area
+        for j in range(start_coords[0], start_coords[0] + oh_level.shape[0]):
+            for k in range(start_coords[1], start_coords[1] + oh_level.shape[1]):
+                for l in range(start_coords[2], start_coords[2] + oh_level.shape[2]):
+                    act_j = j-start_coords[0]
+                    act_k = k-start_coords[1]
+                    act_l = l-start_coords[2]
+                    if repr_type == "block2vec":
+                        dists = np.zeros((len(token_list),))
+                        for i, rep in enumerate(token_list):
+                            dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, act_j, act_k, act_l].detach().cpu()).detach()
+                        bdata[act_j, act_k, act_l] = dists.argmin()
+                    else:
+                        bdata[act_j, act_k, act_l] = oh_level[:, :, act_j, act_k, act_l].argmax()
+
+                    block = wrld.get_block((j, k, l))
+                    block.set_state(BlockState(token_list[bdata[act_j, act_k, act_l]], {}))
+
+    return bdata, token_list
 
 
 def clear_empty_world(worlds_folder, empty_world_name='Curr_Empty_World'):

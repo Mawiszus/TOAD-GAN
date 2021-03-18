@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+import torch.nn.functional as F
 
 from config import Config
 from generate_samples import generate_samples
@@ -6,6 +8,8 @@ from minecraft.special_minecraft_downsampling import special_minecraft_downsampl
 from minecraft.level_utils import clear_empty_world
 from minecraft.level_utils import read_level as mc_read_level
 from models import load_trained_pyramid
+from utils import load_pkl
+from edit_repr_space_experiment import adjust_token_list
 
 
 class GenerateMCSamplesConfig(Config):
@@ -18,6 +22,8 @@ class GenerateMCSamplesConfig(Config):
     # save_tensors: bool = False  # save pytorch .pt tensors?
     not_cuda: bool = False  # disables cuda
     render_obj: bool = False  # if True make .obj files
+
+    use_edited_b2v: bool = False  # Are we using the edited block2vec space or the normal one? (only with block2vec)
 
     def process_args(self):
         super().process_args()
@@ -44,7 +50,15 @@ if __name__ == '__main__':
     real_down = downsample(1, [[opt.scale_v, opt.scale_h, opt.scale_d]], real, opt.token_list)
     real_down = real_down[0]
     in_s = torch.zeros_like(real_down, device=opt.device)
-    prefix = "arbitrary"
+    if opt.use_edited_b2v:
+        prefix = "b2v_edited"
+        # old_block2repr = opt.block2repr
+        opt.block2repr = load_pkl('edited_representations',
+                                  prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+        # update token_list for rendering purposes
+        # opt.token_list = adjust_token_list(opt.token_list)
+    else:
+        prefix = "arbitrary"
 
     # Directory name
     s_dir_name = "%s_random_samples_v%.5f_h%.5f_d%.5f" % (

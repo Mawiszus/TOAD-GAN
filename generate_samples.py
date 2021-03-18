@@ -33,7 +33,7 @@ from megaman.tokens import TOKEN_GROUPS as MEGAMAN_TOKEN_GROUPS
 from mariokart.tokens import TOKEN_GROUPS as MARIOKART_TOKEN_GROUPS
 from mario.special_mario_downsampling import special_mario_downsampling
 from minecraft.special_minecraft_downsampling import special_minecraft_downsampling
-from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world
+from minecraft.level_utils import one_hot_to_blockdata_level, save_level_to_world, clear_empty_world, save_oh_to_wrld_directly
 from minecraft.level_utils import read_level as mc_read_level
 from minecraft.level_renderer import render_minecraft
 from generate_noise import generate_spatial_noise
@@ -229,7 +229,14 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
             if opt.token_insert >= 0 and z_curr.shape[1] == len(token_groups):
                 token_list = [list(group.keys())[0] for group in token_groups]
             else:
-                token_list = opt.token_list
+                # if we have a different block2repr than during training, we need to update the token_list
+                if opt.repr_type is not None:
+                    if opt.token_list == list(opt.block2repr.keys()):
+                        token_list = opt.token_list
+                    else:
+                        token_list = list(opt.block2repr.keys())
+                else:
+                    token_list = opt.token_list
 
             ###########
             # Generate!
@@ -288,6 +295,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         os.makedirs("%s/torch_blockdata" % dir2save, exist_ok=True)
                         real_level = to_level(reals[current_scale], token_list, opt.block2repr, opt.repr_type)
                         torch.save(real_level, "%s/real_bdata.pt" % dir2save)
+                        torch.save(token_list, "%s/token_list.pt" % dir2save)
 
                     level = to_level(I_curr.detach(), token_list, opt.block2repr, opt.repr_type)
                     torch.save(level, "%s/torch_blockdata/%d_sc%d.pt" % (dir2save, n, current_scale))
@@ -300,8 +308,10 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         len_n = math.ceil(math.sqrt(num_samples))  # we arrange our samples in a square in the world
                         x, z = np.unravel_index(n, [len_n, len_n])  # get x, z pos according to index n
                         posx = x * (level.shape[0] + 5)
-                        posz = z * (level.shape[0] + 5)
+                        posz = z * (level.shape[2] + 5)
                         save_level_to_world(opt.output_dir, opt.output_name, (posx, 0, posz), level, token_list)
+                        # save_oh_to_wrld_directly(opt.output_dir, opt.output_name, (posx, 0, posz), I_curr.detach(),
+                        #                          opt.block2repr, opt.repr_type)
                         curr_coords = [[posx, posx + level.shape[0]],
                                        [0, level.shape[1]],
                                        [posz, posz + level.shape[2]]]

@@ -125,10 +125,10 @@ class Config(Tap):
             self.block2repr = None
         elif self.repr_type == "block2vec":
             if self.game == 'minecraft':
-                self.block2repr = load_pkl('prim_cutout_representations_ruins',
-                                           prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
-                # self.block2repr = load_pkl('representations',
-                #                            prepath='/home/awiszus/Project/TOAD-GAN/output/block2vec/')
+                # self.block2repr = load_pkl('prim_cutout_representations_ruins',
+                #                            prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+                self.block2repr = load_pkl("representations",
+                                           f"/home/schubert/projects/TOAD-GAN/input/minecraft/{self.input_area_name}/")
             else:  # mario
                 self.block2repr = load_pkl(self.game + '_all_3D_representations',
                                            prepath='/home/awiszus/Project/TOAD-GAN/output/vec_calc/')

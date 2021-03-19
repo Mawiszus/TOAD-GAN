@@ -89,6 +89,9 @@ def train(real, opt: Config):
     else:
         if opt.game == 'mario':
             scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list, opt.repr_type)
+        elif opt.game == 'minecraft':
+            use_hierarchy = False if opt.repr_type else True
+            scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list, use_hierarchy)
         else:
             scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list)
         reals = [*scaled_list, real]

@@ -43,18 +43,19 @@ if __name__ == '__main__':
     df0 = df0.append(t0_dict, ignore_index=True)
 
     # Histograms:
+    palette = "turbo"
     # Seaborn:
     plt.figure(figsize=(12, 12))
 
     plt.subplot(2, 1, 1)
-    p = sns.barplot(data=df0)
+    p = sns.barplot(data=df0, palette=palette)
     if args.logscale:
         p.set(yscale='log')
     plt.title('Original Level')
     plt.xticks(rotation=30, ha="right")
 
     plt.subplot(2, 1, 2)
-    p = sns.barplot(data=df)
+    p = sns.barplot(data=df, palette=palette)
     # p = sns.displot(t0.reshape(-1), binwidth=1)
     if args.logscale:
         p.set(yscale='log')

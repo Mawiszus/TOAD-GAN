@@ -10,7 +10,7 @@ def make_render_script(scriptpath, scriptname, obj_path, obj_name, worldname, co
         f.write('Minecraft world: ' + worldname + '\n')
         f.write('Selection location min to max: {}, {}, {} to {}, {}, {}\n'.format(
             coords[0][0], coords[1][0], coords[2][0],
-            coords[0][1], coords[1][1], coords[2][1]
+            coords[0][1] - 1, coords[1][1] - 1, coords[2][1] - 1
         ))
         f.write("Scale model by fitting to a height of 100 cm\n")
         f.write('Export for Rendering: ' + os.path.join(obj_path, obj_name) + '.obj')

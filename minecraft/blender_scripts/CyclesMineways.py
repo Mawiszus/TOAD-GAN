@@ -44,6 +44,7 @@
 import bpy
 import sys
 import os
+import math
 print("Libraries imported")
 
 
@@ -979,9 +980,10 @@ def unregister():
 if __name__ == "__main__": # Standard python check to see if the code is being ran, or added as a module
     print("\nStarted Cycles Mineways import script.\n")
 
-    # Assume the last arguments are file_path and scale
-    file_path = os.path.abspath(sys.argv[-2])
-    ortho_scale = float(sys.argv[-1])
+    # Assume the last arguments are file_path and scale and which view
+    file_path = os.path.abspath(sys.argv[-3])
+    ortho_scale = float(sys.argv[-2])
+    view = int(sys.argv[-1])
 
     bpy.ops.object.delete()  # Cube is traditionally selected
     print("Importing ", file_path, "\n")
@@ -994,13 +996,32 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
     bpy.ops.object.select_all(action='DESELECT')
     cam = bpy.data.objects['Camera']
     cam.select = True
-    cam.rotation_euler[0] = 0.954695
-    cam.rotation_euler[2] = 0.785398
     cam.data.type = 'ORTHO'
     cam.data.ortho_scale = ortho_scale  # default 8.5
-    cam.location[0] = 6.75
-    cam.location[1] = -6.75
-    cam.location[2] = 6.75
+    if view == 0:
+        cam.rotation_euler[0] = math.radians(54.7)
+        cam.rotation_euler[2] = math.radians(45)
+        cam.location[0] = 6.75
+        cam.location[1] = -6.75
+        cam.location[2] = 6.75
+    elif view == 1:
+        cam.rotation_euler[0] = math.radians(54.7)
+        cam.rotation_euler[2] = math.radians(135)
+        cam.location[0] = 6.75
+        cam.location[1] = 6.75
+        cam.location[2] = 6.75
+    elif view == 2:
+        cam.rotation_euler[0] = math.radians(54.7)
+        cam.rotation_euler[2] = math.radians(225)
+        cam.location[0] = -6.75
+        cam.location[1] = 6.75
+        cam.location[2] = 6.75
+    elif view == 3:
+        cam.rotation_euler[0] = math.radians(54.7)
+        cam.rotation_euler[2] = math.radians(-45)
+        cam.location[0] = -6.75
+        cam.location[1] = -6.75
+        cam.location[2] = 6.75
 
     # Light settings
     sun = bpy.data.objects['Lamp']
@@ -1013,6 +1034,31 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
 
     # Background transparent
     bpy.context.scene.cycles.film_transparent = True
+
+    # Render settings
+    bpy.context.scene.render.resolution_x = 1920
+    bpy.context.scene.render.resolution_y = 1080
+    bpy.context.scene.render.resolution_percentage = 75  # control size of image: 100% = 1080p
+    bpy.context.scene.render.pixel_aspect_x = 1
+    bpy.context.scene.render.pixel_aspect_y = 1
+    bpy.context.scene.cycles.device = 'GPU'
+
+    # Sampling
+    cycles = bpy.context.scene.cycles
+    cycles.use_square_samples = True
+    # Path Trace
+    cycles.samples = 12
+    cycles.preview_samples = 6
+    # Branched Path Trace
+    cycles.aa_samples = 4
+    cycles.preview_aa_samples = 2
+    cycles.diffuse_samples = 3
+    cycles.glossy_samples = 2
+    cycles.transmission_samples = 2
+    cycles.ao_samples = 1
+    cycles.mesh_light_samples = 2
+    cycles.subsurface_samples = 2
+    cycles.volume_samples = 2
 
     path, name = os.path.split(file_path)
     print("Exporting ", os.path.join(path, name[:-4] + '-render.png'), "\n")

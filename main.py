@@ -1,4 +1,5 @@
 # Code inspired by https://github.com/tamarott/SinGAN
+import subprocess
 from generate_samples import generate_samples
 from train import train
 from mariokart.tokens import REPLACE_TOKENS as MARIOKART_REPLACE_TOKENS
@@ -73,7 +74,11 @@ def main():
     elif opt.game == 'minecraft':
         opt.ImgGen = None
         replace_tokens = None
-        clear_empty_world(opt.output_dir, opt.output_name)
+        try:
+            subprocess.call(["wine", "--version"])
+            clear_empty_world(opt.output_dir, opt.output_name)
+        except OSError:
+            pass
         downsample = special_minecraft_downsampling
     else:
         NameError("name of --game not recognized. Supported: mario, zelda, megaman, mariokart, minecraft")

@@ -55,5 +55,5 @@ if __name__ == '__main__':
         rec = dec(enc(level))
         rec = one_hot_to_blockdata_level(rec, opt.token_list, opt.block2repr, opt.repr_type)
         pos = n * (rec.shape[0] + 5)
-        save_level_to_world(opt.output_dir, 'Curr_Empty_World', (pos, 0, 0), rec, opt.token_list)
+        save_level_to_world(opt.output_dir, 'Curr_Empty_World', (pos, 0, 0), rec, opt.token_list, opt.props)
 

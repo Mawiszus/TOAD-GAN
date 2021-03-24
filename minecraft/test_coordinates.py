@@ -1,5 +1,7 @@
+from tqdm import tqdm
 from utils import load_pkl
-from minecraft.level_utils import read_level_from_file
+from minecraft.level_utils import read_level_from_file, save_oh_to_wrld_directly, clear_empty_world
+from minecraft.level_renderer import render_minecraft
 
 
 def get_coords(coord_dict, input_area_name, sub_coords):
@@ -27,6 +29,7 @@ def get_coords(coord_dict, input_area_name, sub_coords):
 
 if __name__ == '__main__':
     coord_dictionary = load_pkl('primordial_coords_dict', 'input/minecraft/')
+    clear_empty_world('/home/awiszus/Project/minecraft_worlds/', 'Gen_Empty_World')
 
     sub_coord_dictionary = {
         "ruins": [0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
@@ -39,8 +42,13 @@ if __name__ == '__main__':
         # "bay_structure": [0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
     }
 
-    for key in sub_coord_dictionary.keys():
+    for n, key in tqdm(enumerate(sub_coord_dictionary.keys())):
         coords = get_coords(coord_dictionary, key, sub_coord_dictionary[key])
-        level, uniques = read_level_from_file("/home/awiszus/Project/minecraft_worlds/", "Drehmal v2.1 PRIMORDIAL",
-                                              coords, None, None)
+        level, uniques, props = read_level_from_file("/home/awiszus/Project/minecraft_worlds/",
+                                                     "Drehmal v2.1 PRIMORDIAL", coords, None, None)
+        tmp_coords = (0, 0, 0)
+        save_oh_to_wrld_directly('/home/awiszus/Project/minecraft_worlds/', 'Gen_Empty_World', tmp_coords, level,
+                                 None, None, uniques, props)
+        curr_coords = [[0, level.shape[-3]], [0, level.shape[-2]], [0, level.shape[-1]]]
+        render_minecraft({}, "objects", key, 'Gen_Empty_World', curr_coords, basepath='output/real/')
         print(key, " : ", level.shape)

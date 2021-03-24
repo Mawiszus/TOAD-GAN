@@ -365,7 +365,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 render_names = [f"real@{current_scale}", f"G(z)@{current_scale}", f"G(z_opt)@{current_scale}"]
                 for n, level in enumerate(to_render):
                     pos = n * (level.shape[0] + 5)
-                    save_level_to_world(opt.output_dir, worldname, (pos, 0, 0), level, token_list)
+                    save_level_to_world(opt.output_dir, worldname, (pos, 0, 0), level, token_list, opt.props)
                     curr_coords = [[pos, pos + real_scaled.shape[0]],
                                    [0, real_scaled.shape[1]],
                                    [0, real_scaled.shape[2]]]

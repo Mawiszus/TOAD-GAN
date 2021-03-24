@@ -173,8 +173,10 @@ def read_level(opt: Config):
         # opt.coords = ((-1735, -1673), (146, 182), (1861, 1902))  # y, z, x
         # opt.coords = ((-1726, -1709), (146, 182), (1891, 1904))  # y, z, x
 
-    level, uniques = read_level_from_file(opt.input_dir, opt.input_name, opt.coords, opt.block2repr, opt.repr_type)
+    level, uniques, props = read_level_from_file(opt.input_dir, opt.input_name, opt.coords,
+                                                 opt.block2repr, opt.repr_type)
     opt.token_list = uniques
+    opt.props = props
     logger.info("Tokens in level {}", opt.token_list)
     opt.nc_current = level.shape[1]
     return level
@@ -187,11 +189,13 @@ def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, d
         # Representations
         # block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
         uniques = [u for u in block2repr.keys()]
+        props = [None for _ in range(len(uniques))]
         dim = len(block2repr[uniques[0]])  # all are the same size
         level = torch.zeros(
             (1, dim, coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
     else:
         uniques = []
+        props = []
         level = torch.zeros((coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
 
     with World(input_name, input_dir, debug=debug) as wrld:
@@ -199,12 +203,19 @@ def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, d
             for k in range(coords[1][0], coords[1][1]):
                 for l in range(coords[2][0], coords[2][1]):
                     block = wrld.get_block((j, k, l))
+                    # if block.get_state().id:
+                    #     print("ID: ", block.get_state().id)
+                    # if block.get_state().props:
+                    #     print(block.get_state().name, "props:", block.get_state().props)
                     b_name = block.get_state().name
                     if repr_type == "block2vec":
                         level[0, :, j - coords[0][0], k - coords[1][0], l - coords[2][0]] = block2repr[b_name]
+                        if not props[uniques.index(b_name)]:
+                            props[uniques.index(b_name)] = block.get_state().props
                     else:
                         if b_name not in uniques:
                             uniques.append(b_name)
+                            props.append(block.get_state().props)
                         level[j - coords[0][0], k - coords[1][0], l - coords[2][0]] = uniques.index(b_name)
 
     if repr_type == "block2vec":
@@ -218,10 +229,13 @@ def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, d
             device = next(block2repr["encoder"].parameters()).device
             oh_level = block2repr["encoder"](oh_level.to(device)).detach()
 
-    return oh_level, uniques
+    return oh_level, uniques, props
 
 
-def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_list, debug=False):
+def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_list, props=None, debug=False):
+    if not props:
+        props = [{} for _ in range(len(token_list))]
+
     with World(input_name, input_dir, debug=debug) as wrld:
         # clear area with air
         # cvs = Canvas(wrld)
@@ -232,21 +246,24 @@ def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_
                 for l in range(start_coords[2], start_coords[2] + bdata_level.shape[2]):
                     block = wrld.get_block((j, k, l))
                     actual_pos = (j-start_coords[0], k-start_coords[1], l-start_coords[2])
-                    block.set_state(BlockState(token_list[bdata_level[actual_pos]], {}))
+                    block.set_state(BlockState(token_list[bdata_level[actual_pos]], props[bdata_level[actual_pos]]))
 
 
-def save_oh_to_wrld_directly(input_dir, input_name, start_coords, oh_level, block2repr, repr_type, debug=False):
+def save_oh_to_wrld_directly(input_dir, input_name, start_coords, oh_level, block2repr, repr_type, token_list=None, props=None, debug=False):
     if repr_type == "autoencoder":
         oh_level = block2repr["decoder"](oh_level).detach()
     elif repr_type == "block2vec":
         token_list = list(block2repr.keys())
 
+    if not props:
+        props = [{} for _ in range(len(token_list))]
+
     bdata = np.zeros(oh_level.shape[2:], 'uint8')
     with World(input_name, input_dir, debug=debug) as wrld:
         # fill area
-        for j in range(start_coords[0], start_coords[0] + oh_level.shape[0]):
-            for k in range(start_coords[1], start_coords[1] + oh_level.shape[1]):
-                for l in range(start_coords[2], start_coords[2] + oh_level.shape[2]):
+        for j in range(start_coords[0], start_coords[0] + bdata.shape[0]):
+            for k in range(start_coords[1], start_coords[1] + bdata.shape[1]):
+                for l in range(start_coords[2], start_coords[2] + bdata.shape[2]):
                     act_j = j-start_coords[0]
                     act_k = k-start_coords[1]
                     act_l = l-start_coords[2]
@@ -259,7 +276,7 @@ def save_oh_to_wrld_directly(input_dir, input_name, start_coords, oh_level, bloc
                         bdata[act_j, act_k, act_l] = oh_level[:, :, act_j, act_k, act_l].argmax()
 
                     block = wrld.get_block((j, k, l))
-                    block.set_state(BlockState(token_list[bdata[act_j, act_k, act_l]], {}))
+                    block.set_state(BlockState(token_list[bdata[act_j, act_k, act_l]], props[bdata[act_j, act_k, act_l]]))
 
     return bdata, token_list
 

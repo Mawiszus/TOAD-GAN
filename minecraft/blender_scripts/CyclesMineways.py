@@ -1003,25 +1003,25 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
         cam.rotation_euler[2] = math.radians(45)
         cam.location[0] = 6.75
         cam.location[1] = -6.75
-        cam.location[2] = 6.75
+        cam.location[2] = 7
     elif view == 1:
         cam.rotation_euler[0] = math.radians(54.7)
         cam.rotation_euler[2] = math.radians(135)
         cam.location[0] = 6.75
         cam.location[1] = 6.75
-        cam.location[2] = 6.75
+        cam.location[2] = 7
     elif view == 2:
         cam.rotation_euler[0] = math.radians(54.7)
         cam.rotation_euler[2] = math.radians(225)
         cam.location[0] = -6.75
         cam.location[1] = 6.75
-        cam.location[2] = 6.75
+        cam.location[2] = 7
     elif view == 3:
         cam.rotation_euler[0] = math.radians(54.7)
         cam.rotation_euler[2] = math.radians(-45)
         cam.location[0] = -6.75
         cam.location[1] = -6.75
-        cam.location[2] = 6.75
+        cam.location[2] = 7
 
     # Light settings
     sun = bpy.data.objects['Lamp']

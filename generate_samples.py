@@ -311,7 +311,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     # new_schem.saveToFile()
                     if render_images:
                         try:
-                            subprocess.call("wine", "--version")
+                            subprocess.call(["wine", '--version'])
                             # Minecraft World
                             len_n = math.ceil(math.sqrt(num_samples))  # we arrange our samples in a square in the world
                             x, z = np.unravel_index(n, [len_n, len_n])  # get x, z pos according to index n

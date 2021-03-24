@@ -10,19 +10,18 @@ class SkipGramModel(nn.Module):
         self.emb_size = emb_size
         self.emb_dimension = emb_dimension
         self.target_embeddings = nn.Embedding(emb_size, emb_dimension)
-        self.context_embeddings = nn.Embedding(emb_size, emb_dimension)
+        self.output = nn.Linear(emb_dimension, emb_size)
 
         initrange = 1.0 / self.emb_dimension
         init.uniform_(self.target_embeddings.weight.data, -
                       initrange, initrange)
-        init.constant_(self.context_embeddings.weight.data, 0)
 
     def forward(self, target, context):
         emb_target = self.target_embeddings(target)
-        emb_context = self.context_embeddings(context)
 
-        score = torch.sum(
-            torch.mul(emb_target.unsqueeze(1), emb_context), dim=-1)
-        score = -F.logsigmoid(score)
+        score = self.output(emb_target)
+        score = F.log_softmax(score, dim=-1)
 
-        return score.mean()
+        losses = torch.stack([F.nll_loss(score, context_word)
+                              for context_word in context.transpose(0, 1)])
+        return losses.mean()

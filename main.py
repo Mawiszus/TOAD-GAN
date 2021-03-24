@@ -48,7 +48,7 @@ def main():
     opt = Config().parse_args()
 
     # Init wandb
-    run = wandb.init(project="mario", tags=get_tags(opt),
+    run = wandb.init(project="mario", entity="tnt", tags=get_tags(opt),
                      config=opt, dir=opt.out)
     opt.out_ = run.dir
 

@@ -34,6 +34,13 @@ class Block2VecDataset(Dataset):
                     self.y_dim, self.z_dim, self.input_world_path)
         self.neighbor_radius = neighbor_radius
         self._read_blocks()
+        self._init_discards()
+
+    def _init_discards(self):
+        t = 0.001
+        token_frequencies = list(self.block_frequency.values())
+        f = np.array(token_frequencies) / sum(token_frequencies)
+        self.discards = 1.0 - (np.sqrt(f / t) + 1) * (t / f)
 
     def _read_size(self):
         regions = os.listdir(self.world.world_folder / 'region')
@@ -69,11 +76,10 @@ class Block2VecDataset(Dataset):
 
     def __getitem__(self, index):
         coords = self._idx_to_coords(index)
-        assert self.x_lims[0] < coords[0] < self.x_lims[1], f"{coords} from {index}"
-        assert self.y_lims[0] < coords[1] < self.y_lims[1], f"{coords} from {index}"
-        assert self.z_lims[0] < coords[2] < self.z_lims[1], f"{coords} from {index}"
         block = self._get_block(*coords)
         target = self.block2idx[block]
+        if np.random.rand() < self.discards[target]:
+            return self.__getitem__(np.random.randint(self.__len__()))
         neighbor_blocks = self._get_neighbors(*coords)
         context = np.array([self.block2idx[n] for n in neighbor_blocks])
         return target, context

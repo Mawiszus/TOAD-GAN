@@ -1,3 +1,4 @@
+import subprocess
 from typing import Optional
 
 import yaml
@@ -309,19 +310,23 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     # new_schem.set_blockdata(level)
                     # new_schem.saveToFile()
                     if render_images:
-                        # Minecraft World
-                        len_n = math.ceil(math.sqrt(num_samples))  # we arrange our samples in a square in the world
-                        x, z = np.unravel_index(n, [len_n, len_n])  # get x, z pos according to index n
-                        posx = x * (level.shape[0] + 5)
-                        posz = z * (level.shape[2] + 5)
-                        save_level_to_world(opt.output_dir, opt.output_name, (posx, 0, posz), level, token_list, props)
-                        # save_oh_to_wrld_directly(opt.output_dir, opt.output_name, (posx, 0, posz), I_curr.detach(),
-                        #                          opt.block2repr, opt.repr_type)
-                        curr_coords = [[posx, posx + level.shape[0]],
-                                       [0, level.shape[1]],
-                                       [posz, posz + level.shape[2]]]
-                        render_minecraft(opt, "%d" % current_scale, "%d" % n,
-                                         opt.output_name, curr_coords, basepath=dir2save)
+                        try:
+                            subprocess.call("wine", "--version")
+                            # Minecraft World
+                            len_n = math.ceil(math.sqrt(num_samples))  # we arrange our samples in a square in the world
+                            x, z = np.unravel_index(n, [len_n, len_n])  # get x, z pos according to index n
+                            posx = x * (level.shape[0] + 5)
+                            posz = z * (level.shape[2] + 5)
+                            save_level_to_world(opt.output_dir, opt.output_name, (posx, 0, posz), level, token_list, props)
+                            # save_oh_to_wrld_directly(opt.output_dir, opt.output_name, (posx, 0, posz), I_curr.detach(),
+                            #                          opt.block2repr, opt.repr_type)
+                            curr_coords = [[posx, posx + level.shape[0]],
+                                            [0, level.shape[1]],
+                                            [posz, posz + level.shape[2]]]
+                            render_minecraft(opt, "%d" % current_scale, "%d" % n,
+                                                opt.output_name, curr_coords, basepath=dir2save)
+                        except OSError:
+                            pass
 
                 # Save torch tensor
                 if save_tensors:

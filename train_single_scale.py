@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import torch
 import torch.nn as nn
@@ -350,26 +351,30 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                     f.writelines(real_scaled)
                 wandb.save(real_scaled_path)
             else:  # Minecraft
-                real_scaled = to_level(real.detach(), token_list, opt.block2repr, opt.repr_type)
-                # Minecraft Schematic
-                # real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.schematic")
-                # new_schem = NanoMCSchematic(real_scaled_path, real_scaled.shape[:3])
-                # new_schem.set_blockdata(real_scaled)
-                # new_schem.saveToFile()
-                # wandb.save(real_scaled_path)
-                # Minecraft World
-                worldname = 'Curr_Empty_World'
-                clear_empty_world(opt.output_dir, worldname)  # reset tmp world
-                to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr, opt.repr_type),
-                             to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr, opt.repr_type)]
-                render_names = [f"real@{current_scale}", f"G(z)@{current_scale}", f"G(z_opt)@{current_scale}"]
-                for n, level in enumerate(to_render):
-                    pos = n * (level.shape[0] + 5)
-                    save_level_to_world(opt.output_dir, worldname, (pos, 0, 0), level, token_list, opt.props)
-                    curr_coords = [[pos, pos + real_scaled.shape[0]],
-                                   [0, real_scaled.shape[1]],
-                                   [0, real_scaled.shape[2]]]
-                    render_minecraft(opt, str(current_scale), render_names[n], worldname, curr_coords)
+                try:
+                    subprocess.call(["wine", '--version'])
+                    real_scaled = to_level(real.detach(), token_list, opt.block2repr, opt.repr_type)
+                    # Minecraft Schematic
+                    # real_scaled_path = os.path.join(wandb.run.dir, f"real@{current_scale}.schematic")
+                    # new_schem = NanoMCSchematic(real_scaled_path, real_scaled.shape[:3])
+                    # new_schem.set_blockdata(real_scaled)
+                    # new_schem.saveToFile()
+                    # wandb.save(real_scaled_path)
+                    # Minecraft World
+                    worldname = 'Curr_Empty_World'
+                    clear_empty_world(opt.output_dir, worldname)  # reset tmp world
+                    to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr, opt.repr_type),
+                                to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr, opt.repr_type)]
+                    render_names = [f"real@{current_scale}", f"G(z)@{current_scale}", f"G(z_opt)@{current_scale}"]
+                    for n, level in enumerate(to_render):
+                        pos = n * (level.shape[0] + 5)
+                        save_level_to_world(opt.output_dir, worldname, (pos, 0, 0), level, token_list, opt.props)
+                        curr_coords = [[pos, pos + real_scaled.shape[0]],
+                                    [0, real_scaled.shape[1]],
+                                    [0, real_scaled.shape[2]]]
+                        render_minecraft(opt, str(current_scale), render_names[n], worldname, curr_coords)
+                except OSError:
+                    pass
 
             # Learning Rate scheduler step
             schedulerD.step()

@@ -1,4 +1,5 @@
 # Code inspired by https://github.com/tamarott/SinGAN
+import subprocess
 from config import Config
 import os
 
@@ -131,7 +132,11 @@ def train(real, opt: Config):
             img = opt.ImgGen.render(one_hot_to_ascii_level(real, opt.token_list))
             wandb.log({"real": wandb.Image(img)}, commit=False)
         else:  # Minecraft
-            render_minecraft(opt, "real", "real", opt.input_name, opt.coords)
+            try:
+                subprocess.call(["wine", '--version'])
+                render_minecraft(opt, "real", "real", opt.input_name, opt.coords)
+            except OSError:
+                pass
         os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)
 
     # Training Loop

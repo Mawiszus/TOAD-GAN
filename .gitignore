@@ -20,3 +20,4 @@ lightning_logs
 minecraft/block2vec/textures
 minecraft/mineways
 dropbox
+*.slurm.log

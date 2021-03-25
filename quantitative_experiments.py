@@ -20,9 +20,8 @@ from main_tile_pattern import compute_prob, pattern_key
 class QuantitativeExperimentArgs(Tap):
     run_dir: str
     output_dir: str
-    metrics: List[str] = ["tpkldiv"]
-    # TODO(frederik): choose right sizes and weight
-    tpkldiv_pattern_sizes: List[int] = [2, 3, 4]
+    metrics: List[str] = ["levenshtein", "tpkldiv"]
+    tpkldiv_pattern_sizes: List[int] = [5, 10]
     tpkldiv_weight: float = 0.5
 
     def process_args(self) -> None:
@@ -31,19 +30,11 @@ class QuantitativeExperimentArgs(Tap):
 
 
 def compute_levenshtein(real: np.ndarray, generated: List[np.ndarray]):
-    real_str = "".join(real.flatten())
-    generated_str = ["".join(gen.flatten()) for gen in generated]
+    real_str = "".join(real.flatten().astype(str))
+    generated_str = ["".join(gen.flatten().astype(str)) for gen in generated]
     distances = [levenshtein_distance(real_str, gen_str)
                  for gen_str in generated_str]
     return np.mean(distances), np.var(distances)
-
-
-def write_levenshtein(mean_levenshtein: float, var_levenshtein: float, output_path: str):
-    logger.info("Writing Levenshtein results")
-    with open(Path(output_path).joinpath("mean_levenshtein.json"), "w")as f:
-        json.dump(mean_levenshtein, f)
-    with open(Path(output_path).joinpath("var_levenshtein.json"), "w")as f:
-        json.dump(var_levenshtein, f)
 
 
 def compute_tpkldiv(real: np.ndarray, generated: List[np.ndarray], pattern_sizes: List[int], weight: float):
@@ -71,14 +62,6 @@ def compute_tpkldiv(real: np.ndarray, generated: List[np.ndarray], pattern_sizes
     mean_tpkldiv: Dict[int, float] = {k: np.mean(v) for k, v in dists.items()}
     var_tpkldiv: Dict[int, float] = {k: np.var(v) for k, v in dists.items()}
     return mean_tpkldiv, var_tpkldiv
-
-
-def write_tpkldiv(mean_tpkldiv: Dict[int, float], var_tpkldiv: Dict[int, float], output_path: str):
-    logger.info("Writing TP KL-Div results")
-    with open(Path(output_path).joinpath("mean_tpkldiv.json"), "w")as f:
-        json.dump(mean_tpkldiv, f)
-    with open(Path(output_path).joinpath("var_tpkldiv.json"), "w")as f:
-        json.dump(var_tpkldiv, f)
 
 
 def get_pattern_counts(level: np.ndarray, pattern_size: int):
@@ -119,17 +102,25 @@ def load_levels(run_dir: str):
     return real, generated
 
 
+def write_results(output_dir: str, results: Dict):
+    with open(os.path.join(output_dir, "random_samples", "results.json"), "w") as f:
+        json.dump(results, f)
+
+
 def main():
     args = QuantitativeExperimentArgs().parse_args()
     real, generated = load_levels(args.run_dir)
+    results = dict()
     if "tpkldiv" in args.metrics:
         mean_tpkldiv, var_tpkldiv = compute_tpkldiv(
             real, generated, args.tpkldiv_pattern_sizes, args.tpkldiv_weight)
-        write_tpkldiv(mean_tpkldiv, var_tpkldiv, args.output_dir)
+        results["tpkldiv"] = {"mean": mean_tpkldiv, "var": var_tpkldiv}
     if "levenshtein" in args.metrics:
         mean_levenshtein, var_levenshtein = compute_levenshtein(
             real, generated)
-        write_levenshtein(mean_levenshtein, var_levenshtein, args.output_dir)
+        results["levenshtein"] = {
+            "mean": mean_levenshtein, "var": var_levenshtein}
+    write_results(args.output_dir, results)
 
 
 if __name__ == "__main__":

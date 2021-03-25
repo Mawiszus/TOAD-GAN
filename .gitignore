@@ -21,3 +21,13 @@ minecraft/block2vec/textures
 minecraft/mineways
 dropbox
 *.slurm.log
+/input/minecraft/bay_structure
+/input/minecraft/desert
+/input/minecraft/jungle
+/input/minecraft/plains
+/input/minecraft/ruins
+/input/minecraft/simple_beach
+/input/minecraft/snow_forest
+/input/minecraft/swamp
+/input/minecraft/vanilla_mineshaft
+/input/minecraft/vanilla_village

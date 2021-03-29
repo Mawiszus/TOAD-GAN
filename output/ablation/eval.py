@@ -28,7 +28,7 @@ def minecraft_samples(run_dir):
 def main():
     base_path = Path(os.path.abspath(os.path.dirname(__file__)))
     run_paths = base_path.glob("*/runs.txt")
-    with Pool(os.cpu_count()) as pool:
+    with Pool(16) as pool:
         run_dirs = []
         for run_path in tqdm(run_paths):
             with open(run_path, "r") as f:
@@ -38,8 +38,8 @@ def main():
                 run_dir = run_path.parent.joinpath(run_id)
                 run_dirs.append(run_dir)
         pool.map(quantitative_experiments, run_dirs)
-        pool.map(block_histograms, run_dirs)
-        pool.map(minecraft_samples, run_dirs)
+        # pool.map(block_histograms, run_dirs)
+        # pool.map(minecraft_samples, run_dirs)
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+from itertools import product
 import json
 import math
 import multiprocessing as mp
@@ -30,10 +31,9 @@ class QuantitativeExperimentArgs(Tap):
 
 
 def compute_levenshtein(real: np.ndarray, generated: List[np.ndarray]):
-    real_str = "".join(real.flatten().astype(str))
     generated_str = ["".join(gen.flatten().astype(str)) for gen in generated]
-    distances = [levenshtein_distance(real_str, gen_str)
-                 for gen_str in generated_str]
+    distances = [levenshtein_distance(gen_str_1, gen_str_2)
+                 for gen_str_1, gen_str_2 in product(generated_str, generated_str)]
     return np.mean(distances), np.var(distances)
 
 

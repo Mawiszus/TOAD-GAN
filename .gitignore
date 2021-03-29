@@ -32,3 +32,5 @@ input/mario_tmp
 /input/minecraft/swamp
 /input/minecraft/vanilla_mineshaft
 /input/minecraft/vanilla_village
+/ablation/*/*
+!/ablation/*/runs.txt

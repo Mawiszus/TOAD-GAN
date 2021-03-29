@@ -1,8 +1,7 @@
 wandb/
 venv/
 .idea/
-output/wandb
-
+output/
 .vscode/
 .history/
 __pycache__/
@@ -32,5 +31,5 @@ dropbox
 /input/minecraft/swamp
 /input/minecraft/vanilla_mineshaft
 /input/minecraft/vanilla_village
-/output/ablation/*/*
-!/output/ablation/*/runs.txt
+/ablation/*/*
+!/ablation/*/runs.txt

@@ -21,6 +21,7 @@ minecraft/block2vec/textures
 minecraft/mineways
 dropbox
 *.slurm.log
+input/mario_tmp
 /input/minecraft/bay_structure
 /input/minecraft/desert
 /input/minecraft/jungle

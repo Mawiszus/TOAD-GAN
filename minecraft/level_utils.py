@@ -120,29 +120,36 @@ def one_hot_to_blockdata_level(oh_level, tokens, block2repr, repr_type):
     # Representations
     # block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
 
-    if repr_type == "autoencoder":
-        oh_level = block2repr["decoder"](oh_level).detach()
+    with torch.no_grad():
+        if repr_type == "autoencoder":
+            oh_level = block2repr["decoder"](oh_level)
 
-    bdata = np.zeros(oh_level.shape[2:], 'uint8')
-    for y in range(bdata.shape[0]):
-        for z in range(bdata.shape[1]):
-            for x in range(bdata.shape[2]):
-                if repr_type == "block2vec":
-                    dists = np.zeros((len(tokens),))
-                    for i, rep in enumerate(tokens):
-                        if isinstance(block2repr[rep], list):
-                            dists2 = np.zeros((len(block2repr[rep]),))
-                            for j, rep2 in enumerate(block2repr[rep]):
-                                dists2[j] = F.mse_loss(rep2, oh_level[0, :, y, z, x].detach().cpu()).detach()
-                            dists[i] = dists2.min()
-                        else:
-                            dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].detach().cpu()).detach()
-                    bdata[y, z, x] = dists.argmin()
-                else:
-                    bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
+        reprs = torch.stack(list(block2repr.values()))
+        o = oh_level.squeeze().permute(1, 2, 3, 0)[..., None]
+        r = reprs.to("cuda").permute(1, 0)[None, None, None, ...]
+        d = (o - r).pow(2).sum(dim=-2)
+        bdata = d.argmin(dim=-1).cpu()
+
+        # bdata = torch.zeros(*oh_level.shape[2:], dtype=torch.uint8)
+        # for y in range(bdata.shape[0]):
+        #     for z in range(bdata.shape[1]):
+        #         for x in range(bdata.shape[2]):
+        #             if repr_type == "block2vec":
+                        
+        #                 dists = np.zeros((len(tokens),))
+        #                 for i, rep in enumerate(tokens):
+        #                     if isinstance(block2repr[rep], list):
+        #                         dists2 = np.zeros((len(block2repr[rep]),))
+        #                         for j, rep2 in enumerate(block2repr[rep]):
+        #                             dists2[j] = F.mse_loss(rep2, oh_level[0, :, y, z, x].cpu())
+        #                         dists[i] = dists2.min()
+        #                     else:
+        #                         dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].cpu())
+        #                 bdata[y, z, x] = dists.argmin()
+        #             else:
+        #                 bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
 
     return bdata
-
 
 # def read_level_from_file(input_dir, input_name):
 #     """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.

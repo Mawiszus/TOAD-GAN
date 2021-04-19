@@ -1061,8 +1061,8 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
     cycles.volume_samples = 2
 
     path, name = os.path.split(file_path)
-    print("Exporting ", os.path.join(path, name[:-4] + '-render.png'), "\n")
-    bpy.context.scene.render.filepath = os.path.join(path, name[:-4] + '-render.png')
+    print("Exporting ", os.path.join(path, name[:-4] + '-render-' + str(view) + '.png'), "\n")
+    bpy.context.scene.render.filepath = os.path.join(path, name[:-4] + '-render-' + str(view) + '.png')
     bpy.ops.render.render(write_still=True)
 
     print("\nCycles Mineways has finished.\n")

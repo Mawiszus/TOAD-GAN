@@ -59,6 +59,7 @@ if __name__ == '__main__':
         # opt.token_list = adjust_token_list(opt.token_list)
     else:
         prefix = "arbitrary"
+        # prefix = "all_scales"
 
     # Directory name
     s_dir_name = "%s_random_samples_v%.5f_h%.5f_d%.5f" % (

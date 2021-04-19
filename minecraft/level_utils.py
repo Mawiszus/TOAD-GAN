@@ -124,30 +124,18 @@ def one_hot_to_blockdata_level(oh_level, tokens, block2repr, repr_type):
         if repr_type == "autoencoder":
             oh_level = block2repr["decoder"](oh_level)
 
-        reprs = torch.stack(list(block2repr.values()))
-        o = oh_level.squeeze().permute(1, 2, 3, 0)[..., None]
-        r = reprs.to("cuda").permute(1, 0)[None, None, None, ...]
-        d = (o - r).pow(2).sum(dim=-2)
-        bdata = d.argmin(dim=-1).cpu()
-
-        # bdata = torch.zeros(*oh_level.shape[2:], dtype=torch.uint8)
-        # for y in range(bdata.shape[0]):
-        #     for z in range(bdata.shape[1]):
-        #         for x in range(bdata.shape[2]):
-        #             if repr_type == "block2vec":
-                        
-        #                 dists = np.zeros((len(tokens),))
-        #                 for i, rep in enumerate(tokens):
-        #                     if isinstance(block2repr[rep], list):
-        #                         dists2 = np.zeros((len(block2repr[rep]),))
-        #                         for j, rep2 in enumerate(block2repr[rep]):
-        #                             dists2[j] = F.mse_loss(rep2, oh_level[0, :, y, z, x].cpu())
-        #                         dists[i] = dists2.min()
-        #                     else:
-        #                         dists[i] = F.mse_loss(block2repr[rep], oh_level[0, :, y, z, x].cpu())
-        #                 bdata[y, z, x] = dists.argmin()
-        #             else:
-        #                 bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
+        elif repr_type == "block2vec":
+            reprs = torch.stack(list(block2repr.values()))
+            o = oh_level.squeeze().permute(1, 2, 3, 0)[..., None]
+            r = reprs.to("cuda").permute(1, 0)[None, None, None, ...]
+            d = (o - r).pow(2).sum(dim=-2)
+            bdata = d.argmin(dim=-1).cpu()
+        else:  # No repr
+            bdata = torch.zeros(*oh_level.shape[2:], dtype=torch.uint8)
+            for y in range(bdata.shape[0]):
+                for z in range(bdata.shape[1]):
+                    for x in range(bdata.shape[2]):
+                        bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
 
     return bdata
 
@@ -253,7 +241,10 @@ def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_
                 for l in range(start_coords[2], start_coords[2] + bdata_level.shape[2]):
                     block = wrld.get_block((j, k, l))
                     actual_pos = (j-start_coords[0], k-start_coords[1], l-start_coords[2])
-                    block.set_state(BlockState(token_list[bdata_level[actual_pos]], props[bdata_level[actual_pos]]))
+                    try:
+                        block.set_state(BlockState(token_list[bdata_level[actual_pos]], props[bdata_level[actual_pos]]))
+                    except Exception:
+                        print(start_coords, actual_pos)
 
 
 def save_oh_to_wrld_directly(input_dir, input_name, start_coords, oh_level, block2repr, repr_type, token_list=None, props=None, debug=False):

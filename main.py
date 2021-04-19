@@ -29,7 +29,7 @@ def get_tags(opt):
     if opt.use_multiple_inputs:
         return [name.split(".")[0] for name in opt.input_names]
     else:
-        return [opt.input_name.split(".")[0]]
+        return [opt.input_name.split(".")[0], str(opt.scales), str(opt.repr_type), opt.input_area_name]
 
 
 def main():
@@ -110,7 +110,7 @@ def main():
         use_reals = reals
         use_maps = noise_maps
     generate_samples(generators, use_maps, use_reals,
-                     noise_amplitudes, opt, num_samples=20, in_s=in_s)
+                     noise_amplitudes, opt, render_images=False, num_samples=100, in_s=in_s)
 
     # Generate samples of smaller size than level
     # logger.info("Generating arbitrary sized random samples...")

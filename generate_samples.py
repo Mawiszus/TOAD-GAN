@@ -238,7 +238,17 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         props = opt.props
                     else:
                         token_list = list(opt.block2repr.keys())
-                        props = [{} for _ in range(len(token_list))]
+                        props = []
+                        for tok in token_list:
+                            if tok == 'minecraft:cut_red_sandstone_slab' or tok == "minecraft:cobblestone_slab":
+                                props.append({'waterlogged': 'false', 'type': 'bottom'})
+                            elif tok == "minecraft:smooth_red_sandstone_stairs":
+                                props.append({'half': 'bottom', 'waterlogged': 'false', 'shape': 'straight', 'facing': 'south'})
+                            else:
+                                props.append({})
+
+                        # props = [{'waterlogged': 'false', 'half': 'lower', 'type': 'bottom'} for _ in range(len(token_list))]
+                        # props = opt.props  # should work if you don't sub weird things?
                         # TODO: how to deal with props in transfer experiment?
                 else:
                     token_list = opt.token_list
@@ -268,7 +278,6 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                                                                            1 - opt.seed_road.to(opt.device))
 
             # Save all scales
-
             # if True:
             # Save scale 0 and last scale
             # if current_scale == 0 or current_scale == len(reals) - 1:
@@ -302,6 +311,14 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         real_level = to_level(reals[current_scale], token_list, opt.block2repr, opt.repr_type)
                         torch.save(real_level, "%s/real_bdata.pt" % dir2save)
                         torch.save(token_list, "%s/token_list.pt" % dir2save)
+                        if render_images:
+                            os.makedirs("%s/reals" % dir2save, exist_ok=True)
+                            save_level_to_world(opt.output_dir, opt.output_name, (0, 0, 0), real_level, token_list, props)
+                            curr_coords = [[0, real_level.shape[0]],
+                                           [0, real_level.shape[1]],
+                                           [0, real_level.shape[2]]]
+                            render_minecraft(opt, "reals", "%d_real" % current_scale, opt.output_name, curr_coords,
+                                             basepath=dir2save)
 
                     level = to_level(I_curr.detach(), token_list, opt.block2repr, opt.repr_type)
                     torch.save(level, "%s/torch_blockdata/%d_sc%d.pt" % (dir2save, n, current_scale))

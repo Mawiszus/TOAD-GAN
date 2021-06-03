@@ -166,6 +166,8 @@ def read_level_from_file(input_dir, input_name, tokens=None, replace_tokens=REPL
         if repr and "encoder" in repr:
             device = next(repr["encoder"].parameters()).device
             oh_level = repr["encoder"](oh_level.to(device)).detach()
+            if isinstance(oh_level, tuple):
+                oh_level = oh_level[0]
     else:
         uniques = list(repr.keys())
         txt_level = load_level_from_text("%s/%s" % (input_dir, input_name), replace_tokens)

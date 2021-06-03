@@ -6,11 +6,10 @@
 #SBATCH --mem=32GB
 #SBATCH --gpus=1
 #SBATCH --job-name=toadgan
-#SBATCH --output=/home/schubert/projects/TOAD-GAN/%x-%j.slurm.log
 
 cd $SLURM_SUBMIT_DIR
 echo $CONDA_ENV
-. $CONDA_PREFIX_1/bin/activate $CONDA_ENV
+. /home/awiszus/miniconda3/tmp/bin/activate $CONDA_ENV
 
 echo "Running $@ from $SLURM_SUBMIT_DIR"
 srun $@

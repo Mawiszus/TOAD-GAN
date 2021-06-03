@@ -123,6 +123,11 @@ def one_hot_to_blockdata_level(oh_level, tokens, block2repr, repr_type):
     with torch.no_grad():
         if repr_type == "autoencoder":
             oh_level = block2repr["decoder"](oh_level)
+            bdata = torch.zeros(*oh_level.shape[2:], dtype=torch.uint8)
+            for y in range(bdata.shape[0]):
+                for z in range(bdata.shape[1]):
+                    for x in range(bdata.shape[2]):
+                        bdata[y, z, x] = oh_level[:, :, y, z, x].argmax()
 
         elif repr_type == "block2vec":
             reprs = torch.stack(list(block2repr.values()))
@@ -171,6 +176,10 @@ def read_level(opt: Config):
     level, uniques, props = read_level_from_file(opt.input_dir, opt.input_name, opt.coords,
                                                  opt.block2repr, opt.repr_type)
     opt.token_list = uniques
+    if opt.repr_type == "autoencoder":
+        opt.token_list = torch.load('input/minecraft/simple_autoencoder_token_list.pt')
+        if uniques != opt.token_list:
+            raise AssertionError("Tokens were read in a different order than before")
     opt.props = props
     logger.info("Tokens in level {}", opt.token_list)
     opt.nc_current = level.shape[1]
@@ -222,7 +231,11 @@ def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, d
 
         if repr_type == "autoencoder":
             device = next(block2repr["encoder"].parameters()).device
-            oh_level = block2repr["encoder"](oh_level.to(device)).detach()
+            oh_level = block2repr["encoder"](oh_level.to(device))
+            if isinstance(oh_level, tuple):
+                oh_level = oh_level[0].detach()
+            else:
+                oh_level = oh_level.detach()
 
     return oh_level, uniques, props
 

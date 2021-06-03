@@ -237,7 +237,11 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         token_list = opt.token_list
                         props = opt.props
                     else:
-                        token_list = list(opt.block2repr.keys())
+                        if opt.repr_type == "block2vec":
+                            token_list = list(opt.block2repr.keys())
+                        else:
+                            # token_list = opt.token_list
+                            token_list = torch.load('input/minecraft/simple_autoencoder_token_list.pt')
                         props = []
                         for tok in token_list:
                             if tok == 'minecraft:cut_red_sandstone_slab' or tok == "minecraft:cobblestone_slab":

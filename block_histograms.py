@@ -36,8 +36,12 @@ if __name__ == '__main__':
 
     sorted_names = sorted(t0_dict, key=t0_dict.get, reverse=True)
 
-    chi2_vals = []
-    p_vals = []
+    chi2_vals_1 = []
+    chi2_vals_2 = []
+    chi2_vals_3 = []
+    p_vals_1 = []
+    p_vals_2 = []
+    p_vals_3 = []
     t_mat = np.zeros((len(files), np.prod(t0.shape)), dtype='uint8')
     df = pd.DataFrame()
     for i, f in enumerate(files):
@@ -46,12 +50,30 @@ if __name__ == '__main__':
         sum_dict = {}
         for j, tok in enumerate(token_names):
             sum_dict[pruned_names[j]] = (t[:] == j).sum()  # / t0_dict[pruned_names[j]]
-        c2, p = chisquare(list(sum_dict.values()), list(t0_dict.values()))
-        chi2_vals.append(c2)
-        p_vals.append(p)
+        # sum_list = list(sum_dict.values())
+        sum_list = []
+        t0_list = []
+        for name in sorted_names:  # need to make this list sorted
+            sum_list.append(sum_dict[name])
+            t0_list.append(t0_dict[name])
+        split = len(sum_list) // 3
+        sum_1, sum_2, sum_3 = sum_list[0:split], sum_list[split:2*split], sum_list[2*split:]
+        t0_1, t0_2, t0_3 = t0_list[0:split], t0_list[split:2*split], t0_list[2*split:]
+        c2_1, p_1 = chisquare(sum_1, t0_1)
+        c2_2, p_2 = chisquare(sum_2, t0_2)
+        c2_3, p_3 = chisquare(sum_3, t0_3)
+        # c2_3, p_3 = chisquare(list(sum_dict.values()), list(t0_dict.values()))
+        chi2_vals_1.append(c2_1)
+        chi2_vals_2.append(c2_2)
+        chi2_vals_3.append(c2_3)
+        p_vals_1.append(p_1)
+        p_vals_2.append(p_2)
+        p_vals_3.append(p_3)
         df = df.append(sum_dict, ignore_index=True)
 
-    print("Mean chi2 and p: ", sum(chi2_vals)/len(chi2_vals), sum(p_vals)/len(p_vals))
+    print("Mean chi2 and p 1. third: ", sum(chi2_vals_1)/len(chi2_vals_1), sum(p_vals_1)/len(p_vals_1))
+    print("Mean chi2 and p 2. third: ", sum(chi2_vals_2)/len(chi2_vals_2), sum(p_vals_2)/len(p_vals_2))
+    print("Mean chi2 and p 3. third: ", sum(chi2_vals_3)/len(chi2_vals_3), sum(p_vals_3)/len(p_vals_3))
 
     # Histograms:
     palette = "turbo"

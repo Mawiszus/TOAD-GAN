@@ -255,7 +255,10 @@ def save_level_to_world(input_dir, input_name, start_coords, bdata_level, token_
                     block = wrld.get_block((j, k, l))
                     actual_pos = (j-start_coords[0], k-start_coords[1], l-start_coords[2])
                     try:
-                        block.set_state(BlockState(token_list[bdata_level[actual_pos]], props[bdata_level[actual_pos]]))
+                        if props:
+                            block.set_state(BlockState(token_list[bdata_level[actual_pos]], props[bdata_level[actual_pos]]))
+                        else:
+                            block.set_state(BlockState(token_list[bdata_level[actual_pos]], {}))
                     except Exception:
                         print(start_coords, actual_pos)
 

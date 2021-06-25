@@ -163,6 +163,10 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', use_dropout=False, in
     elif netG == 'resnet_3blocks':
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer, use_dropout=use_dropout, n_blocks=3,
                               is_3d=is_3d)
+    elif netG == 'unet_32':
+        net = UnetGenerator(input_nc, output_nc, 5, ngf, norm_layer=norm_layer, use_dropout=use_dropout, is_3d=is_3d)
+    elif netG == 'unet_64':
+        net = UnetGenerator(input_nc, output_nc, 6, ngf, norm_layer=norm_layer, use_dropout=use_dropout, is_3d=is_3d)
     elif netG == 'unet_128':
         net = UnetGenerator(input_nc, output_nc, 7, ngf, norm_layer=norm_layer, use_dropout=use_dropout, is_3d=is_3d)
     elif netG == 'unet_256':
@@ -407,7 +411,7 @@ class ResnetGenerator(nn.Module):
         if is_3d:
             model += [nn.ReplicationPad3d(3)]
             model += [nn.Conv3d(ngf, output_nc, kernel_size=7, padding=0)]
-            model += [nn.Softmax(dim=1)]
+            # model += [nn.Softmax(dim=1)]
         else:
             model += [nn.ReflectionPad2d(3)]
             model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
@@ -578,10 +582,12 @@ class UnetSkipConnectionBlock(nn.Module):
         if input_nc is None:
             input_nc = outer_nc
         if is_3d:
-            downconv = nn.Conv3d(input_nc, inner_nc, kernel_size=4,
+            kernel = 4
+            downconv = nn.Conv3d(input_nc, inner_nc, kernel_size=kernel,
                                  stride=2, padding=1, bias=use_bias)
         else:
-            downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
+            kernel = 4
+            downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=kernel,
                                  stride=2, padding=1, bias=use_bias)
         downrelu = nn.LeakyReLU(0.2, True)
         downnorm = norm_layer(inner_nc)
@@ -591,23 +597,26 @@ class UnetSkipConnectionBlock(nn.Module):
         if outermost:
             if is_3d:
                 upconv = nn.ConvTranspose3d(inner_nc * 2, outer_nc,
-                                            kernel_size=4, stride=2,
+                                            kernel_size=kernel, stride=2,
                                             padding=1)
             else:
                 upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                            kernel_size=4, stride=2,
+                                            kernel_size=kernel, stride=2,
                                             padding=1)
             down = [downconv]
-            up = [uprelu, upconv, nn.Tanh()]
+            if is_3d:
+                up = [uprelu, upconv]  # , nn.Softmax(dim=1)]
+            else:
+                up = [uprelu, upconv, nn.Tanh()]
             model = down + [submodule] + up
         elif innermost:
             if is_3d:
                 upconv = nn.ConvTranspose3d(inner_nc, outer_nc,
-                                            kernel_size=4, stride=2,
+                                            kernel_size=kernel, stride=2,
                                             padding=1, bias=use_bias)
             else:
                 upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
-                                            kernel_size=4, stride=2,
+                                            kernel_size=kernel, stride=2,
                                             padding=1, bias=use_bias)
             down = [downrelu, downconv]
             up = [uprelu, upconv, upnorm]
@@ -615,11 +624,11 @@ class UnetSkipConnectionBlock(nn.Module):
         else:
             if is_3d:
                 upconv = nn.ConvTranspose3d(inner_nc * 2, outer_nc,
-                                            kernel_size=4, stride=2,
+                                            kernel_size=kernel, stride=2,
                                             padding=1, bias=use_bias)
             else:
                 upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                            kernel_size=4, stride=2,
+                                            kernel_size=kernel, stride=2,
                                             padding=1, bias=use_bias)
             down = [downrelu, downconv, downnorm]
             up = [uprelu, upconv, upnorm]

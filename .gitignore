@@ -34,3 +34,4 @@ input/mario_tmp
 /input/minecraft/vanilla_village
 /ablation/*/*
 !/ablation/*/runs.txt
+/results/

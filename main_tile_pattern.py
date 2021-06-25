@@ -16,7 +16,6 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from tqdm import tqdm
 
 import wandb
-from mario.level_snippet_dataset import LevelSnippetDataset
 
 
 class Params(Tap):
@@ -77,7 +76,7 @@ def compute_prob(pattern_count, num_patterns, epsilon=1e-7):
     """
     return (pattern_count + epsilon) / ((num_patterns + epsilon) * (1 + epsilon))
 
-
+"""
 def main():
     logger.remove()
     logger.add(
@@ -211,7 +210,4 @@ def compute_kl_divergence(dataset, test_level_dir, hparams):
     var_kl_divergence = np.std(kl_divergences)
     logger.info("Average KL-Divergence: {}", round(mean_kl_divergence, 2))
     return mean_kl_divergence, var_kl_divergence
-
-
-if __name__ == "__main__":
-    main()
+"""

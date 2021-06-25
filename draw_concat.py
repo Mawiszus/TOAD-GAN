@@ -2,7 +2,6 @@
 from torch.nn.functional import interpolate
 
 from generate_noise import generate_spatial_noise
-from mario.level_utils import group_to_token
 from utils import interpolate3D
 
 
@@ -13,8 +12,6 @@ def format_and_use_generator(curr_img, G_z, count, mode, Z_opt, pad_noise, pad_i
             G_z = interpolate(G_z, curr_img.shape[-2:], mode='bilinear', align_corners=True)
         else:  # Assuming again that 2D/3D shuld have raised an exception by now
             G_z = interpolate3D(G_z, curr_img.shape[-3:], mode='bilinear', align_corners=True)
-    if count == (opt.token_insert + 1):  # (opt.stop_scale - 1):
-        G_z = group_to_token(G_z, opt.token_list)
     if mode == "rand":
         curr_img = pad_noise(curr_img)  # Curr image is z in this case
         z_add = curr_img

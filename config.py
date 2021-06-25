@@ -9,16 +9,11 @@ from torch import cuda
 from tap import Tap
 
 from utils import set_seed, load_pkl
-from mariokart.level_image_gen import LevelImageGen as MariokartLevelGen
-from zelda.level_image_gen import LevelImageGen as ZeldaLevelGen
-from mario.level_image_gen import LevelImageGen as MarioLevelGen
-from megaman.level_image_gen import LevelImageGen as MegamanLevelGen
 from minecraft.block_autoencoder import Encoder, Decoder
 
 
 class Config(Tap):
-    game: Literal["mario", "mariokart", "megaman",
-                  "zelda", "minecraft"] = "mario"  # Which game is to be used?
+    # game: Literal["minecraft"] = "minecraft"  # Which game is to be used? ONLY MINECRAFT
     not_cuda: bool = False  # disables cuda
     netG: str = ""  # path to netG (to continue training)
     netD: str = ""  # path to netD (to continue training)
@@ -54,8 +49,6 @@ class Config(Tap):
     Dsteps: int = 3  # discriminator inner steps
     lambda_grad: float = 0.1  # gradient penalty weight
     alpha: int = 100  # reconstruction loss weight
-    # layer in which token groupings will be split out (<-2 means no grouping at all)
-    token_insert: int = -2
     token_list: List[str] = ['!', '#', '-', '1', '@', 'C', 'S',
                              'U', 'X', 'g', 'k', 't']  # default list of 1-1
 
@@ -91,35 +84,26 @@ class Config(Tap):
         # which scale to stop on - usually always last scale defined
         self.stop_scale = self.num_scales + 1
 
-        if self.game == 'mario':
-            self.ImgGen = MarioLevelGen(self.game + "/sprites")
-        elif self.game == 'mariokart':
-            self.ImgGen = MariokartLevelGen(self.game + "/sprites")
-        elif self.game == 'megaman':
-            self.ImgGen = MegamanLevelGen(self.game + "/sprites")
-        elif self.game == 'zelda':
-            self.ImgGen = ZeldaLevelGen(self.game + "/sprites")
-        else:  # minecraft
-            coord_dict = load_pkl('primordial_coords_dict', 'input/minecraft/')
-            tmp_coords = coord_dict[self.input_area_name]
-            sub_coords = [(self.sub_coords[0], self.sub_coords[1]),
-                          (self.sub_coords[2], self.sub_coords[3]),
-                          (self.sub_coords[4], self.sub_coords[5])]
-            self.coords = []
-            for i, (start, end) in enumerate(sub_coords):
-                curr_len = tmp_coords[i][1] - tmp_coords[i][0]
-                if isinstance(start, float):
-                    tmp_start = curr_len * start + tmp_coords[i][0]
-                    tmp_end = curr_len * end + tmp_coords[i][0]
-                elif isinstance(start, int):
-                    tmp_start = tmp_coords[i][0] + start
-                    tmp_end = tmp_coords[i][0] + end
-                else:
-                    AttributeError("Unexpected type for sub_coords")
-                    tmp_start = tmp_coords[i][0]
-                    tmp_end = tmp_coords[i][1]
+        coord_dict = load_pkl('primordial_coords_dict', 'input/minecraft/')
+        tmp_coords = coord_dict[self.input_area_name]
+        sub_coords = [(self.sub_coords[0], self.sub_coords[1]),
+                      (self.sub_coords[2], self.sub_coords[3]),
+                      (self.sub_coords[4], self.sub_coords[5])]
+        self.coords = []
+        for i, (start, end) in enumerate(sub_coords):
+            curr_len = tmp_coords[i][1] - tmp_coords[i][0]
+            if isinstance(start, float):
+                tmp_start = curr_len * start + tmp_coords[i][0]
+                tmp_end = curr_len * end + tmp_coords[i][0]
+            elif isinstance(start, int):
+                tmp_start = tmp_coords[i][0] + start
+                tmp_end = tmp_coords[i][0] + end
+            else:
+                AttributeError("Unexpected type for sub_coords")
+                tmp_start = tmp_coords[i][0]
+                tmp_end = tmp_coords[i][1]
 
-                self.coords.append((int(tmp_start), int(tmp_end)))
+            self.coords.append((int(tmp_start), int(tmp_end)))
 
         if not self.repr_type:
             self.block2repr = None

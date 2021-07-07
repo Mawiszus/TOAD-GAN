@@ -117,20 +117,13 @@ class Config(Tap):
                 self.block2repr = load_pkl(self.game + '_all_3D_representations',
                                            prepath='/home/awiszus/Project/TOAD-GAN/output/vec_calc/')
         elif self.repr_type == "autoencoder":
-            # So far only Minecraft
-            if self.game == 'minecraft' or self.game == "mario":
-                name = self.game
-                if name == "mario":
-                    name += "_tmp"
-                self.block2repr = {"encoder": torch.load("input/" + name + "/simple_encoder.pt"),
-                                   "decoder": torch.load("input/" + name + "/simple_decoder.pt")}
-                self.block2repr["encoder"] = self.block2repr["encoder"].to(self.device)
-                self.block2repr["decoder"] = self.block2repr["decoder"].to(self.device)
-                self.block2repr["encoder"].requires_grad = False
-                self.block2repr["decoder"].requires_grad = False
-                self.block2repr["encoder"].eval()
-                self.block2repr["decoder"].eval()
-            else:
-                AttributeError("unexpected repr_type for this --game")
+            self.block2repr = {"encoder": torch.load("input/minecraft/simple_encoder.pt"),
+                               "decoder": torch.load("input/minecraft/simple_decoder.pt")}
+            self.block2repr["encoder"] = self.block2repr["encoder"].to(self.device)
+            self.block2repr["decoder"] = self.block2repr["decoder"].to(self.device)
+            self.block2repr["encoder"].requires_grad = False
+            self.block2repr["decoder"].requires_grad = False
+            self.block2repr["encoder"].eval()
+            self.block2repr["decoder"].eval()
         else:
             AttributeError("unexpected repr_type, use [None, block2vec, autoencoder]")

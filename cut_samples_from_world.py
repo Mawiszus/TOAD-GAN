@@ -33,8 +33,9 @@ if __name__ == '__main__':
         if render_images:
             try:
                 subprocess.call(["wine", '--version'])
-                render_minecraft({}, "samples", "%d" % n, "Plains_only", curr_coords,
-                                 basepath=dir2save)
+                obj_path = os.path.join(dir2save, "objects")
+                os.makedirs(obj_path, exist_ok=True)
+                render_minecraft("Plains_only", curr_coords, obj_path, str(n))
             except OSError:
                 pass
 

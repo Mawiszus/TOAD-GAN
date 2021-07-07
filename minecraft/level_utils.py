@@ -144,45 +144,28 @@ def one_hot_to_blockdata_level(oh_level, tokens, block2repr, repr_type):
 
     return bdata
 
-# def read_level_from_file(input_dir, input_name):
-#     """ Returns a full token level tensor from a .txt file. Also returns the unique tokens found in this level.
-#     Token. """
-#     bdata = load_schematic(os.path.join(input_dir, input_name))
-#     uniques = set()
-#     for y in range(bdata.shape[0]):
-#         for z in range(bdata.shape[1]):
-#             for x in range(bdata.shape[2]):
-#                 uniques.add(tuple(bdata[y, z, x]))
-#     uniques = list(uniques)
-#     uniques.sort()  # necessary! otherwise we won't know the token order later
-#     oh_level = blockdata_to_one_hot_level(bdata, uniques)
-#     return oh_level.unsqueeze(dim=0), uniques
-
 
 def read_level(opt: Config):
     """ Wrapper function for read_level_from_file using namespace opt. Updates parameters for opt."""
-    # If we have multiple levels as input, we need to sync the tokens
+    # Multi-Input not implemented, but if we wanted to use it, we would need to sync the tokens
 
-    # Default: Only one input level
     # with World Files, we need the coords of our actual level
     if not opt.coords:
-        # Ruins
-        # opt.coords = ((1028, 1076), (60, 80), (1088, 1127))  # y, z, x
+        # Default coords: Ruins
         opt.coords = ((1044, 1060), (64, 80), (1104, 1120))  # y, z, x
-        # Fortress
-        # opt.coords = ((-1735, -1673), (146, 182), (1861, 1902))  # y, z, x
-        # opt.coords = ((-1726, -1709), (146, 182), (1891, 1904))  # y, z, x
 
     level, uniques, props = read_level_from_file(opt.input_dir, opt.input_name, opt.coords,
                                                  opt.block2repr, opt.repr_type)
+    # Adjust token list depending on representation
     opt.token_list = uniques
     if opt.repr_type == "autoencoder":
         opt.token_list = torch.load('input/minecraft/simple_autoencoder_token_list.pt')
         if uniques != opt.token_list:
             raise AssertionError("Tokens were read in a different order than before")
-    opt.props = props
+
+    opt.props = props  # Properties need to be saved for later for rendering
     logger.info("Tokens in level {}", opt.token_list)
-    opt.nc_current = level.shape[1]
+    opt.nc_current = level.shape[1]  # nc = number of channels
     return level
 
 
@@ -190,27 +173,25 @@ def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, d
     """ coords is ((y0,yend), (z0,zend), (x0,xend)) """
 
     if repr_type == "block2vec":
-        # Representations
-        # block2repr = load_pkl('prim_cutout_representations', prepath='/home/awiszus/Project/TOAD-GAN/input/minecraft/')
+        # Read Representations
         uniques = [u for u in block2repr.keys()]
         props = [None for _ in range(len(uniques))]
         dim = len(block2repr[uniques[0]])  # all are the same size
+
         level = torch.zeros(
             (1, dim, coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
     else:
         uniques = []
         props = []
+        # Init level with zeros
         level = torch.zeros((coords[0][1] - coords[0][0], coords[1][1] - coords[1][0], coords[2][1] - coords[2][0]))
 
+    # Read PyAnvil format
     with World(input_name, input_dir, debug=debug) as wrld:
         for j in range(coords[0][0], coords[0][1]):
             for k in range(coords[1][0], coords[1][1]):
                 for l in range(coords[2][0], coords[2][1]):
                     block = wrld.get_block((j, k, l))
-                    # if block.get_state().id:
-                    #     print("ID: ", block.get_state().id)
-                    # if block.get_state().props:
-                    #     print(block.get_state().name, "props:", block.get_state().props)
                     b_name = block.get_state().name
                     if repr_type == "block2vec":
                         level[0, :, j - coords[0][0], k - coords[1][0], l - coords[2][0]] = block2repr[b_name]
@@ -223,13 +204,16 @@ def read_level_from_file(input_dir, input_name, coords, block2repr, repr_type, d
                         level[j - coords[0][0], k - coords[1][0], l - coords[2][0]] = uniques.index(b_name)
 
     if repr_type == "block2vec":
+        # For block2vec, directly use representation vectors
         oh_level = level
     else:
+        # Else we need the one hot encoding
         oh_level = torch.zeros((1, len(uniques),) + level.shape)
         for i, tok in enumerate(uniques):
             oh_level[0, i] = (level == i)
 
         if repr_type == "autoencoder":
+            # Autoencoder takes a one hot encoded level as input to get representations
             device = next(block2repr["encoder"].parameters()).device
             oh_level = block2repr["encoder"](oh_level.to(device))
             if isinstance(oh_level, tuple):

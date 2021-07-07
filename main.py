@@ -36,12 +36,14 @@ def main():
     opt = Config().parse_args()
 
     # Init wandb
-    run = wandb.init(project="mario", entity="tnt", tags=get_tags(opt),
+    run = wandb.init(project="world-gan", entity="tnt", tags=get_tags(opt),
                      config=opt, dir=opt.out)
     opt.out_ = run.dir
 
-    # Init game specific inputs
+    # Relic from old code, where the results where rendered with a generator
     opt.ImgGen = None
+
+    # Check if wine is available to use (Linux) and clear the MC world examples will be saved to
     try:
         subprocess.call(["wine", "--version"])
         clear_empty_world(opt.output_dir, opt.output_name)
@@ -51,10 +53,13 @@ def main():
     # Read level according to input arguments
     real = mc_read_level(opt)
 
+    # Multi-Input is taken over from old code but not implemented for Minecraft
     if opt.use_multiple_inputs:
-        for i, r in enumerate(real):
-            real[i] = r.to(opt.device)
-        opt.level_shape = real[0].shape[2:]
+        logger.info("Multiple inputs are not implemented yet for Minecraft.")
+        raise NotImplementedError
+        # for i, r in enumerate(real):
+        #     real[i] = r.to(opt.device)
+        # opt.level_shape = real[0].shape[2:]
     else:
         real = real.to(opt.device)
         opt.level_shape = real.shape[2:]

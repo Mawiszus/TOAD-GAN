@@ -189,18 +189,19 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                 # Save level
                 # Minecraft
                 if n == 0:  # in first step make folder and save real blockdata
-                    os.makedirs("%s/torch_blockdata" % dir2save, exist_ok=True)
+                    bdata_pth = "%s/torch_blockdata" % dir2save
+                    os.makedirs(bdata_pth, exist_ok=True)
                     real_level = to_level(reals[current_scale], token_list, opt.block2repr, opt.repr_type)
                     torch.save(real_level, "%s/real_bdata.pt" % dir2save)
                     torch.save(token_list, "%s/token_list.pt" % dir2save)
                     if render_images:
-                        os.makedirs("%s/reals" % dir2save, exist_ok=True)
+                        real_pth = "%s/reals" % dir2save
+                        os.makedirs(real_pth, exist_ok=True)
                         save_level_to_world(opt.output_dir, opt.output_name, (0, 0, 0), real_level, token_list, props)
                         curr_coords = [[0, real_level.shape[0]],
                                        [0, real_level.shape[1]],
                                        [0, real_level.shape[2]]]
-                        render_minecraft(opt, "reals", "%d_real" % current_scale, opt.output_name, curr_coords,
-                                         basepath=dir2save)
+                        render_minecraft(opt.output_name, curr_coords, real_pth, "%d_real" % current_scale)
 
                 level = to_level(I_curr.detach(), token_list, opt.block2repr, opt.repr_type)
                 torch.save(level, "%s/torch_blockdata/%d_sc%d.pt" % (dir2save, n, current_scale))
@@ -209,6 +210,8 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                 # new_schem.set_blockdata(level)
                 # new_schem.saveToFile()
                 if render_images:
+                    obj_pth = "%s/objects/%d" % (dir2save, current_scale)
+                    os.makedirs(obj_pth, exist_ok=True)
                     try:
                         subprocess.call(["wine", '--version'])
                         # Minecraft World
@@ -222,8 +225,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                         curr_coords = [[posx, posx + level.shape[0]],
                                         [0, level.shape[1]],
                                         [posz, posz + level.shape[2]]]
-                        render_minecraft(opt, "%d" % current_scale, "%d" % n,
-                                            opt.output_name, curr_coords, basepath=dir2save)
+                        render_minecraft(opt.output_name, curr_coords, obj_pth, "%d" % n)
                     except OSError:
                         pass
 

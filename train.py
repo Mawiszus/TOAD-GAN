@@ -16,6 +16,8 @@ from train_single_scale import train_single_scale
 
 
 def calc_lowest_possible_scale(level, kernel_size, num_layers):
+    """Calculates the lowest size the generator will accept in each dimension.
+    It depends on the number/size of layers."""
     needed_pad = math.floor(kernel_size/2) * num_layers
     min_size = (needed_pad * 2) + 2
     sizes = level.shape[2:]
@@ -33,55 +35,66 @@ def train(real, opt: Config):
 
     min_scales = calc_lowest_possible_scale(real, opt.ker_size, opt.num_layer)
 
+    # Calculate if scales need to be adjusted
     scales = []
     print('Scale Info:')
     for x in opt.scales:
         scales.append([max(x, min_scales[0]), max(x, min_scales[1]), max(x, min_scales[2])])
-    # scales = [[x, x, x] for x in opt.scales]
     print(scales)
     opt.num_scales = len(scales)
 
-    downsampling = special_minecraft_downsampling
-
     if opt.use_multiple_inputs:
+        # Multi Input is not tested for Minecraft
         reals = []
         for level in real:
-            scaled_list = downsampling(opt.num_scales, scales, level, opt.token_list)
+            scaled_list = special_minecraft_downsampling(opt.num_scales, scales, level, opt.token_list)
             tmp_reals = [*scaled_list, level]
             reals.append(tmp_reals)
     else:
+        # Get the "real" sample
+        # Depending on if representations are used, downsampling is different
         use_hierarchy = False if opt.repr_type else True
-        scaled_list = downsampling(opt.num_scales, scales, real, opt.token_list, use_hierarchy)
+        scaled_list = special_minecraft_downsampling(opt.num_scales, scales, real, opt.token_list, use_hierarchy)
         reals = [*scaled_list, real]
         print("Scaled Shapes:")
         for r in reals:
             print(r.shape)
 
     if opt.use_multiple_inputs:
+        # Multi Input is not tested for Minecraft
         input_from_prev_scale = []
         for group in reals:
             input_from_prev_scale.append(torch.zeros_like(group[0]))
 
         stop_scale = len(reals[0])
     else:
+        # Default
         input_from_prev_scale = torch.zeros_like(reals[0])
         stop_scale = len(reals)
 
     opt.stop_scale = stop_scale
 
     # Log the original input level(s) as an image
-    if opt.use_multiple_inputs:  # multiple inputs will not work right now, remove?
+    if opt.use_multiple_inputs:
+        # Multi Input is not tested for Minecraft
         for i, level in enumerate(real):
             try:
                 subprocess.call(["wine", '--version'])
-                render_minecraft(opt, "real", "real", opt.input_names[i], opt.coords)
+                obj_pth = os.path.join(opt.out_, "objects/real")
+                os.makedirs(obj_pth, exist_ok=True)
+                real_obj_pth = render_minecraft(opt.input_names[i], opt.coords, obj_pth, "real")
+                wandb.log({"real": wandb.Object3D(open(real_obj_pth))}, commit=False)
             except OSError:
                 pass
     else:
         # Default: One image
         try:
+            # Check if wine is installed (Linux), then render
             subprocess.call(["wine", '--version'])
-            render_minecraft(opt, "real", "real", opt.input_name, opt.coords)
+            obj_pth = os.path.join(opt.out_, "objects/real")
+            os.makedirs(obj_pth, exist_ok=True)
+            real_obj_pth = render_minecraft(opt.input_name, opt.coords, obj_pth, "real")
+            wandb.log({"real": wandb.Object3D(open(real_obj_pth))}, commit=False)
         except OSError:
             pass
         os.makedirs("%s/state_dicts" % (opt.out_), exist_ok=True)

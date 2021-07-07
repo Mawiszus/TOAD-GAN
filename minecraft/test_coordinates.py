@@ -50,5 +50,5 @@ if __name__ == '__main__':
         save_oh_to_wrld_directly('/home/awiszus/Project/minecraft_worlds/', 'Gen_Empty_World', tmp_coords, level,
                                  None, None, uniques, props)
         curr_coords = [[0, level.shape[-3]], [0, level.shape[-2]], [0, level.shape[-1]]]
-        render_minecraft({}, "objects", key, 'Gen_Empty_World', curr_coords, basepath='output/real/')
+        render_minecraft('Gen_Empty_World', curr_coords, "output/real/objects", key)
         print(key, " : ", level.shape)

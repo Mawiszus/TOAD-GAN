@@ -32,13 +32,11 @@ def make_obj(scriptpath, scriptnames, worldpath="../minecraft_worlds/"):
     print(stderr)
 
 
-def render_minecraft(opt, folder, name, worldname, coords, basepath=None):
-    if not basepath:
-        basepath = opt.out_
-    os.makedirs("%s/objects/%s" % (basepath, folder), exist_ok=True)
-    objectpath = os.path.join(basepath, "objects/" + folder + "/")
-    make_render_script("minecraft/mineways/", name, objectpath, name, worldname, coords)
-    make_obj("minecraft/mineways/", [name, "close"])
-    obj_path = objectpath + name + ".obj"
-    if wandb.run:
-        wandb.log({name: wandb.Object3D(open(obj_path))}, commit=False)
+def render_minecraft(world_name, coords_to_read, obj_path, obj_name):
+    """Render a Minecraft snippet with Mineways. Returns the path to the rendered .obj file."""
+    # os.makedirs("%s/objects/%s" % (obj_path, folder), exist_ok=True)
+    # objectpath = os.path.join(basepath, "objects/" + folder + "/")
+    make_render_script("minecraft/mineways/", obj_name, obj_path, obj_name, world_name, coords_to_read)
+    make_obj("minecraft/mineways/", [obj_name, "close"])
+    rendered_path = os.path.join(obj_path, obj_name + ".obj")
+    return rendered_path

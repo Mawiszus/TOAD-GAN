@@ -32,7 +32,6 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
     the amplitudes for the noise in all the scales. opt is a namespace that holds all necessary parameters. """
     current_scale = len(generators)
 
-    token_group = None
     clear_empty_world(opt.output_dir, 'Curr_Empty_World')  # reset tmp world
 
     if opt.use_multiple_inputs:
@@ -235,7 +234,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
             for j in range(opt.Gsteps):
                 G.zero_grad()
-                fake = G(noise.detach(), prev.detach(), temperature=1 if current_scale != opt.token_insert else 1)
+                fake = G(noise.detach(), prev.detach(), temperature=1)
                 output = D(fake)
 
                 errG = -output.mean()
@@ -253,7 +252,7 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
 
                 if opt.alpha != 0:  # i. e. we are trying to find an exact recreation of our input in the lat space
                     Z_opt = opt.noise_amp * z_opt + z_prev
-                    G_rec = G(Z_opt.detach(), z_prev, temperature=1 if current_scale != opt.token_insert else 1)
+                    G_rec = G(Z_opt.detach(), z_prev, temperature=1)
                     rec_loss = opt.alpha * F.mse_loss(G_rec, real)
                     rec_loss.backward(retain_graph=False)  # TODO: Check for unexpected argument retain_graph=True
                     rec_loss = rec_loss.detach()
@@ -286,13 +285,16 @@ def train_single_scale(D, G, reals, generators, noise_maps, input_from_prev_scal
                 to_render = [real_scaled, to_level(fake.detach(), token_list, opt.block2repr, opt.repr_type),
                             to_level(G(Z_opt.detach(), z_prev), token_list, opt.block2repr, opt.repr_type)]
                 render_names = [f"real@{current_scale}", f"G(z)@{current_scale}", f"G(z_opt)@{current_scale}"]
+                obj_pth = os.path.join(opt.out_, f"objects/{current_scale}")
+                os.makedirs(obj_pth, exist_ok=True)
                 for n, level in enumerate(to_render):
                     pos = n * (level.shape[0] + 5)
                     save_level_to_world(opt.output_dir, worldname, (pos, 0, 0), level, token_list, opt.props)
                     curr_coords = [[pos, pos + real_scaled.shape[0]],
                                    [0, real_scaled.shape[1]],
                                    [0, real_scaled.shape[2]]]
-                    render_minecraft(opt, str(current_scale), render_names[n], worldname, curr_coords)
+                    render_pth = render_minecraft(worldname, curr_coords, obj_pth, render_names[n])
+                    wandb.log({render_names[n]: wandb.Object3D(open(render_pth))}, commit=False)
             except OSError:
                 pass
 

@@ -992,37 +992,6 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
     main()  # Runs the main script
     #register() # Sets up the GUI
 
-    # Camera settings
-    bpy.ops.object.select_all(action='DESELECT')
-    cam = bpy.data.objects['Camera']
-    cam.select = True
-    cam.data.type = 'ORTHO'
-    cam.data.ortho_scale = ortho_scale  # default 8.5
-    if view == 0:
-        cam.rotation_euler[0] = math.radians(54.7)
-        cam.rotation_euler[2] = math.radians(45)
-        cam.location[0] = 6.75
-        cam.location[1] = -6.75
-        cam.location[2] = 7
-    elif view == 1:
-        cam.rotation_euler[0] = math.radians(54.7)
-        cam.rotation_euler[2] = math.radians(135)
-        cam.location[0] = 6.75
-        cam.location[1] = 6.75
-        cam.location[2] = 7
-    elif view == 2:
-        cam.rotation_euler[0] = math.radians(54.7)
-        cam.rotation_euler[2] = math.radians(225)
-        cam.location[0] = -6.75
-        cam.location[1] = 6.75
-        cam.location[2] = 7
-    elif view == 3:
-        cam.rotation_euler[0] = math.radians(54.7)
-        cam.rotation_euler[2] = math.radians(-45)
-        cam.location[0] = -6.75
-        cam.location[1] = -6.75
-        cam.location[2] = 7
-
     # Light settings
     sun = bpy.data.objects['Lamp']
     sun.data.type = 'SUN'
@@ -1033,12 +1002,12 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
     sun.data.node_tree.nodes['Emission'].inputs['Strength'].default_value = 2.0
 
     # Background transparent
-    bpy.context.scene.cycles.film_transparent = True
+    # bpy.context.scene.cycles.film_transparent = True
 
     # Render settings
     bpy.context.scene.render.resolution_x = 1920
     bpy.context.scene.render.resolution_y = 1080
-    bpy.context.scene.render.resolution_percentage = 75  # control size of image: 100% = 1080p
+    bpy.context.scene.render.resolution_percentage = 100  # control size of image: 100% = 1080p
     bpy.context.scene.render.pixel_aspect_x = 1
     bpy.context.scene.render.pixel_aspect_y = 1
     bpy.context.scene.cycles.device = 'GPU'
@@ -1060,9 +1029,62 @@ if __name__ == "__main__": # Standard python check to see if the code is being r
     cycles.subsurface_samples = 2
     cycles.volume_samples = 2
 
+    # Camera settings
+    bpy.ops.object.select_all(action='DESELECT')
+    cam = bpy.data.objects['Camera']
+    cam.select = True
+    cam.data.type = 'ORTHO'
+    cam.data.ortho_scale = ortho_scale  # default 8.5
+
+    cam.constraints.new('TRACK_TO')
+    bpy.ops.object.empty_add(type='PLAIN_AXES', view_align=False, location=(0, 0, 1))
+    bpy.ops.object.select_all(action='DESELECT')
+    cam.select = True
+    cam.constraints["Track To"].target = bpy.data.objects["Empty"]
+    cam.constraints["Track To"].track_axis = 'TRACK_NEGATIVE_Z'
+    cam.constraints["Track To"].up_axis = 'UP_Y'
+
+    if view == 0:
+        # cam.rotation_euler[0] = math.radians(54.7)
+        # cam.rotation_euler[2] = math.radians(45)
+        cam.location[0] = 6.75
+        cam.location[1] = -6.75
+        cam.location[2] = 7
+    elif view == 1:
+        # cam.rotation_euler[0] = math.radians(54.7)
+        # cam.rotation_euler[2] = math.radians(135)
+        cam.location[0] = 6.75
+        cam.location[1] = 6.75
+        cam.location[2] = 7
+    elif view == 2:
+        # cam.rotation_euler[0] = math.radians(54.7)
+        # cam.rotation_euler[2] = math.radians(225)
+        cam.location[0] = -6.75
+        cam.location[1] = 6.75
+        cam.location[2] = 7
+    elif view == 3:
+        # cam.rotation_euler[0] = math.radians(54.7)
+        # cam.rotation_euler[2] = math.radians(-45)
+        cam.location[0] = -6.75
+        cam.location[1] = -6.75
+        cam.location[2] = 7
+    elif view == -1:
+        # render video
+        # cam.rotation_euler[0] = math.radians(54.7)
+        cam.location[2] = 8
+        r = math.sqrt(2*(math.pow(6.75, 2)))
+        xy_vals = [(math.sin(math.radians(phi))*r, math.cos(math.radians(phi))*r) for phi in range(0, 359, 5)]
+
     path, name = os.path.split(file_path)
     print("Exporting ", os.path.join(path, name[:-4] + '-render-' + str(view) + '.png'), "\n")
-    bpy.context.scene.render.filepath = os.path.join(path, name[:-4] + '-render-' + str(view) + '.png')
-    bpy.ops.render.render(write_still=True)
+    if view != -1:
+        bpy.context.scene.render.filepath = os.path.join(path, name[:-4] + '-render-' + str(view) + '.png')
+        bpy.ops.render.render(write_still=True)
+    else:
+        for i, (x, y) in enumerate(xy_vals):
+            cam.location[0] = x
+            cam.location[1] = y
+            bpy.context.scene.render.filepath = os.path.join(path, name[:-4] + '_video_render/render-frame-' + str(i) + '.png')
+            bpy.ops.render.render(write_still=True)
 
     print("\nCycles Mineways has finished.\n")

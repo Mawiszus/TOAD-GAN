@@ -1,0 +1,1 @@
+ffmpeg -r 15 -f image2 -i $1/render-frame-%d.png -vcodec libx264 -crf 25 -vf format=yuv420p $1/video.mp4

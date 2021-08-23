@@ -192,7 +192,7 @@ def generate_samples(generators, noise_maps, reals, noise_amplitudes, opt: Gener
                     bdata_pth = "%s/torch_blockdata" % dir2save
                     os.makedirs(bdata_pth, exist_ok=True)
                     real_level = to_level(reals[current_scale], token_list, opt.block2repr, opt.repr_type)
-                    torch.save(real_level, "%s/real_bdata.pt" % dir2save)
+                    torch.save(real_level, "%s/real_bdata_sc%d.pt" % (dir2save, current_scale))
                     torch.save(token_list, "%s/token_list.pt" % dir2save)
                     if render_images:
                         real_pth = "%s/reals" % dir2save

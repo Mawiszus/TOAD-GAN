@@ -1,10 +1,7 @@
 # Code inspired by https://github.com/tamarott/SinGAN
 from generate_samples import generate_samples
 from train import train
-from mariokart.tokens import REPLACE_TOKENS as MARIOKART_REPLACE_TOKENS
 from mario.tokens import REPLACE_TOKENS as MARIO_REPLACE_TOKENS
-from mariokart.level_image_gen import LevelImageGen as MariokartLevelGen
-from mariokart.special_mariokart_downsampling import special_mariokart_downsampling
 from mario.level_image_gen import LevelImageGen as MarioLevelGen
 from mario.special_mario_downsampling import special_mario_downsampling
 from mario.level_utils import read_level, read_level_from_file
@@ -49,12 +46,6 @@ def main():
         opt.ImgGen = MarioLevelGen(sprite_path)
         replace_tokens = MARIO_REPLACE_TOKENS
         downsample = special_mario_downsampling
-    elif opt.game == 'mariokart':
-        opt.ImgGen = MariokartLevelGen(sprite_path)
-        replace_tokens = MARIOKART_REPLACE_TOKENS
-        downsample = special_mariokart_downsampling
-    else:
-        NameError("name of --game not recognized. Supported: mario, mariokart")
 
     # Read level according to input arguments
     real = read_level(opt, None, replace_tokens).to(opt.device)
